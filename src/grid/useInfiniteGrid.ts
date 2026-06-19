@@ -85,7 +85,10 @@ export function useInfiniteGrid() {
     if (isOverImage !== markerLit.current) {
       markerLit.current = isOverImage;
       const m = markerRef.current;
-      if (m) m.style.opacity = isOverImage ? '0.9' : '0.25';
+      if (m) {
+        m.style.opacity = isOverImage ? '1' : '0.25';
+        m.classList.toggle('app__center-marker--focused', isOverImage);
+      }
     }
 
     if (col !== centerRef.current.col || row !== centerRef.current.row) {

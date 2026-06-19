@@ -77,6 +77,10 @@
   left: 50%;
   width: 12px;
   height: 12px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   /* White glassy bead. */
   background: rgba(255, 255, 255, 0.4);
@@ -89,9 +93,46 @@
   transform: translate(-50%, -50%);
   transform-origin: center;
   opacity: 0.25;
+  overflow: hidden;
   pointer-events: none;
-  will-change: opacity;
-  transition: opacity 0.08s ease-out;
+  will-change: width, height, opacity;
+  transition:
+    width 0.26s cubic-bezier(0.2, 0.9, 0.2, 1),
+    height 0.26s cubic-bezier(0.2, 0.9, 0.2, 1),
+    border-radius 0.26s cubic-bezier(0.2, 0.9, 0.2, 1),
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.08s ease-out;
+}
+
+.app:not(.is-panning) .app__center-marker--focused {
+  width: auto;
+  padding: 0 10px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fff;
+  border-color: rgba(227, 242, 255, 0.9);
+  box-shadow: 0 2px 6px rgba(38, 66, 84, 0.12);
+}
+
+.app__center-marker-price {
+  color: #264254;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.82);
+  transition:
+    opacity 0.16s ease 0.08s,
+    transform 0.18s ease 0.06s;
+}
+
+.app:not(.is-panning) .app__center-marker--focused .app__center-marker-price {
+  opacity: 1;
+  transform: scale(1);
 }
 
 /* ---- Header ---- */
@@ -247,7 +288,7 @@
   bottom: 0;
   /* Tall enough to enclose the outfit preview + input as one dock, so there's
      no hard edge above the items. The mask fades the blur out toward the top. */
-  height: 340px;
+  height: 300px;
   pointer-events: none;
   background:
     radial-gradient(125% 80% at 50% 100%, rgba(227, 242, 255, 0.42) 0%, rgba(227, 242, 255, 0.12) 46%, rgba(227, 242, 255, 0) 76%),
@@ -259,12 +300,14 @@
 }
 
 /* ---- Bottom dock ---- */
+/* Edge-to-edge so the query sheet can sit flush against the screen bottom; the
+   sheet handles its own safe-area inset. */
 .app__dock {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0 12px calc(18px + env(safe-area-inset-bottom));
+  padding: 0;
   display: flex;
   flex-direction: column;
   pointer-events: none;
@@ -282,7 +325,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 /* While the grid pans, everything but the grid hides. Staged transition:
@@ -322,36 +365,23 @@
   -webkit-backdrop-filter: none;
 }
 
-.preview__price {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 20px 0 16px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid rgba(227, 242, 255, 0.7);
-  box-shadow: 0 6px 20px rgba(38, 66, 84, 0.12);
+.preview__label {
+  align-self: stretch;
+  text-align: center;
+  max-width: 414px;
+  margin: 0;
   color: #264254;
-  font-weight: 700;
-  font-size: 18px;
-  white-space: nowrap;
-}
-.preview__price-bag {
-  display: grid;
-  place-items: center;
-}
-.preview__bag-icon {
-  width: 22px;
-  height: 22px;
-  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .preview__strip {
   display: flex;
   justify-content: center;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 16px;
   width: 100%;
   max-width: 414px;
   /* Vertical padding gives the chip shadows room before the scroll clip — an
@@ -368,8 +398,16 @@
   display: none;
 }
 
-.preview__chip {
+/* Each constituent piece: circle with price badge overlapping the bottom edge. */
+.preview__item {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  scroll-snap-align: center;
+}
+
+.preview__chip {
   position: relative;
   width: 64px;
   height: 64px;
@@ -378,8 +416,23 @@
   background: #fff;
   box-shadow: 0 3px 10px rgba(38, 66, 84, 0.12);
   cursor: pointer;
-  scroll-snap-align: center;
   overflow: hidden;
+}
+
+.preview__badge {
+  position: relative;
+  z-index: 1;
+  margin-top: -11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e3f2ff;
+  color: #264254;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
 }
 /* Absolutely sized so a tall image can't inflate an intrinsic track and get
    clipped — the box is a fixed 12px inset and object-fit keeps the whole
@@ -394,19 +447,21 @@
   pointer-events: none;
 }
 
-/* ---- Query input pill (Figma) ---- */
+/* ---- Query input — bottom sheet/drawer (same glass styling as the pill) ---- */
 .query {
-  align-self: center;
+  position: relative;
+  align-self: stretch;
   width: 100%;
-  max-width: 414px;
+  max-width: none;
   min-height: 72px;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px 6px 16px;
-  border-radius: 999px;
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom)) 20px;
+  border-radius: 28px 28px 0 0;
   background: rgba(255, 255, 255, 0.62);
   border: 2px solid rgba(227, 242, 255, 0.5);
+  border-bottom: none;
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
   box-shadow: 0 0 12px 0 #B3CEE6;
