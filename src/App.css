@@ -1,0 +1,383 @@
+@font-face {
+  font-family: 'Melodrama';
+  src: url('/fonts/Melodrama-Variable.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+  --chrome-x: 0px;
+  --chrome-y: 0px;
+}
+
+.app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: #fff;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* ---- Grid ---- */
+.grid-surface {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+}
+.grid-surface:active {
+  cursor: grabbing;
+}
+
+.grid-pan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+
+.tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* No card, no shadow — just the transparent PNG. Focus is shown by opacity. */
+  opacity: 0.55;
+  transition: opacity 0.28s ease;
+  will-change: transform;
+}
+
+.tile--center {
+  opacity: 1;
+}
+
+.tile__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  display: block;
+  pointer-events: none;
+}
+
+/* Target reticle. Opacity is driven from JS so it brightens over image tiles. */
+.app__center-marker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  /* White glassy bead. */
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(4px) saturate(140%);
+  -webkit-backdrop-filter: blur(4px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+  opacity: 0.25;
+  pointer-events: none;
+  will-change: opacity;
+  transition: opacity 0.08s ease-out;
+}
+
+/* ---- Header ---- */
+.header-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(138px + env(safe-area-inset-top));
+  pointer-events: none;
+  z-index: 9;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.44) 48%, rgba(255, 255, 255, 0) 100%);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 54%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 54%, transparent 100%);
+}
+
+.app__header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  min-height: calc(72px + env(safe-area-inset-top));
+  padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+}
+
+.header__brand,
+.header__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.header__brand {
+  gap: 8px;
+  min-width: 0;
+}
+
+.header__actions {
+  gap: 12px;
+}
+
+.header__back-pill {
+  height: 40px;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid #e3f2ff;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #264254;
+  box-shadow: 0 1px 8px rgba(38, 66, 84, 0.08);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.header__back-pill .header__icon {
+  transform: translate(-1px);
+}
+
+.header__back-logo {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.header__button {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border: 1px solid #e3f2ff;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.86);
+  color: #264254;
+  box-shadow: 0 1px 8px rgba(38, 66, 84, 0.08);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.header__back-pill,
+.header__button,
+.query {
+  transform: translate3d(var(--chrome-x), var(--chrome-y), 0);
+  will-change: transform;
+}
+
+.header__icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  transform: translate(-1px, -1px);
+}
+
+.header__title {
+  color: #264254;
+  font-family: 'Melodrama', Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.weather-pill {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  color: #264254;
+  pointer-events: auto;
+}
+
+.weather-pill__icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: block;
+  object-fit: contain;
+}
+
+.weather-pill__stats {
+  display: flex;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.weather-pill__stats span:first-child {
+  font-size: 15px;
+}
+
+.weather-pill__stats--muted {
+  color: #758998;
+}
+
+/* ---- Blue blurred bottom section ---- */
+/* Sits behind the pill, blurs + blue-tints the grid items scrolling beneath.
+   Masked so the blur fades out toward the top (no hard edge). */
+.dock-backdrop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 180px;
+  pointer-events: none;
+  background:
+    radial-gradient(125% 80% at 50% 100%, rgba(227, 242, 255, 0.42) 0%, rgba(227, 242, 255, 0.12) 46%, rgba(227, 242, 255, 0) 76%),
+    linear-gradient(to top, rgba(227, 242, 255, 0.5) 0%, rgba(227, 242, 255, 0) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  -webkit-mask-image: linear-gradient(to top, #000 52%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 52%, transparent 100%);
+}
+
+/* ---- Bottom dock ---- */
+.app__dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 12px calc(18px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.app__dock > * {
+  pointer-events: auto;
+}
+
+/* ---- Query input pill (Figma) ---- */
+.query {
+  align-self: center;
+  width: 100%;
+  max-width: 414px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 6px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 2px solid rgba(227, 242, 255, 0.5);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  box-shadow: 0 0 12px 0 #B3CEE6;
+}
+.query__input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.query__input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #2a2a33;
+  font-size: 16px; /* >=16px avoids iOS zoom-on-focus */
+  line-height: 1.25;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.query__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  color: #8a8a93;
+  font-size: 16px;
+  line-height: 1.25;
+  padding: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity 0.15s ease-out,
+    filter 0.15s ease-out;
+}
+.query__placeholder--hidden {
+  opacity: 0;
+  filter: blur(4px);
+}
+.query__placeholder--hidden .query__caret {
+  animation: none;
+  opacity: 0;
+}
+.query__caret {
+  display: inline-block;
+  width: 1px;
+  height: 1.1em;
+  margin-left: 1px;
+  background: #8a8a93;
+  animation: query-caret-blink 1s step-end infinite;
+}
+@keyframes query-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.query__send {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(20, 20, 40, 0.06);
+  color: #4a4a55;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+.query__send-icon {
+  transition: transform 0.25s ease;
+}
+.query__send--active {
+  background: #264254;
+  color: #fff;
+}
+.query__send--active .query__send-icon {
+  transform: rotate(-45deg);
+}
