@@ -100,7 +100,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: calc(138px + env(safe-area-inset-top));
+  height: calc(100px + env(safe-area-inset-top));
   pointer-events: none;
   z-index: 9;
   background:
@@ -118,11 +118,10 @@
   right: 0;
   z-index: 30;
   min-height: calc(72px + env(safe-area-inset-top));
-  padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
+  padding: calc(4px + env(safe-area-inset-top)) 16px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
   pointer-events: none;
 }
 
@@ -282,7 +281,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
@@ -352,7 +351,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   max-width: 414px;
   /* Vertical padding gives the chip shadows room before the scroll clip — an
