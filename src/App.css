@@ -11,8 +11,6 @@
   inset: 0;
   overflow: hidden;
   background: var(--bg);
-  --chrome-x: 0px;
-  --chrome-y: 0px;
 }
 
 .app::before {
@@ -54,7 +52,9 @@
   /* No card, no shadow — just the transparent PNG. Focus is shown by opacity. */
   opacity: 0.55;
   transition: opacity 0.28s ease;
-  will-change: transform;
+  /* No will-change here: tiles never animate individually, only the parent
+     .grid-pan moves. Promoting each tile would spawn ~49 GPU layers; instead
+     they paint once into the single parent layer that the pan transforms. */
 }
 
 .tile--center {
@@ -187,13 +187,6 @@
   pointer-events: auto;
 }
 
-.header__back-pill,
-.header__button,
-.query {
-  transform: translate3d(var(--chrome-x), var(--chrome-y), 0);
-  will-change: transform;
-}
-
 .header__icon {
   width: 20px;
   height: 20px;
@@ -253,15 +246,17 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 180px;
+  /* Tall enough to enclose the outfit preview + input as one dock, so there's
+     no hard edge above the items. The mask fades the blur out toward the top. */
+  height: 340px;
   pointer-events: none;
   background:
     radial-gradient(125% 80% at 50% 100%, rgba(227, 242, 255, 0.42) 0%, rgba(227, 242, 255, 0.12) 46%, rgba(227, 242, 255, 0) 76%),
     linear-gradient(to top, rgba(227, 242, 255, 0.5) 0%, rgba(227, 242, 255, 0) 100%);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  -webkit-mask-image: linear-gradient(to top, #000 52%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 52%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 64%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 64%, transparent 100%);
 }
 
 /* ---- Bottom dock ---- */
@@ -279,12 +274,133 @@
   pointer-events: auto;
 }
 
+/* ---- Outfit preview (total price + constituent items) ---- */
+/* The whole block blurs + fades out while the grid moves and resolves back in
+   when an item locks under the reticle. Transition only — no per-frame work. */
+.preview {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* While the grid pans, everything but the grid hides. Staged transition:
+   on the way OUT blur leads then fade; on the way IN fade leads then sharpen
+   (the base rule below is the "settled" target, so its timing runs on exit). */
+.app__header,
+.app__dock,
+.header-backdrop,
+.dock-backdrop {
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity 0.22s ease,
+    filter 0.22s ease 0.16s;
+  will-change: opacity, filter;
+}
+.app.is-panning .app__header,
+.app.is-panning .app__dock,
+.app.is-panning .header-backdrop,
+.app.is-panning .dock-backdrop {
+  opacity: 0;
+  filter: blur(14px);
+  pointer-events: none;
+  transition:
+    filter 0.22s ease,
+    opacity 0.22s ease 0.16s;
+}
+/* Drop all the expensive backdrop work entirely while hidden. */
+.app.is-panning .header-backdrop,
+.app.is-panning .dock-backdrop {
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.app.is-panning .query {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.preview__price {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 20px 0 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(227, 242, 255, 0.7);
+  box-shadow: 0 6px 20px rgba(38, 66, 84, 0.12);
+  color: #264254;
+  font-weight: 700;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.preview__price-bag {
+  display: grid;
+  place-items: center;
+}
+.preview__bag-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.preview__strip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 414px;
+  /* Vertical padding gives the chip shadows room before the scroll clip — an
+     overflow-x scroller forces overflow-y to clip at the padding box. */
+  padding: 14px 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.preview__strip::-webkit-scrollbar {
+  display: none;
+}
+
+.preview__chip {
+  flex: 0 0 auto;
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(227, 242, 255, 0.8);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(38, 66, 84, 0.12);
+  cursor: pointer;
+  scroll-snap-align: center;
+  overflow: hidden;
+}
+/* Absolutely sized so a tall image can't inflate an intrinsic track and get
+   clipped — the box is a fixed 12px inset and object-fit keeps the whole
+   product inside the circle's inscribed area. */
+.preview__chip-img {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: calc(100% - 24px);
+  height: calc(100% - 24px);
+  object-fit: contain;
+  pointer-events: none;
+}
+
 /* ---- Query input pill (Figma) ---- */
 .query {
   align-self: center;
   width: 100%;
   max-width: 414px;
-  min-height: 80px;
+  min-height: 72px;
   display: flex;
   align-items: center;
   gap: 4px;

@@ -7,7 +7,7 @@
   --glass: rgba(22, 22, 32, 0.55);
   --glass-border: rgba(255, 255, 255, 0.12);
 
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   color: var(--text);
   color-scheme: light;
   -webkit-font-smoothing: antialiased;

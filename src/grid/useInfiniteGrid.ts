@@ -27,14 +27,8 @@ const TILE_OFFSET_Y = (CELL_H - TILE_H) / 2;
 
 // Snap-to-item tuning. Radius is screen-space around the fixed reticle.
 const SNAP_RADIUS = 160;
-const SNAP_IDLE_MS = 180;
+const SNAP_IDLE_MS = 100;
 const SNAP_DURATION_MS = 260;
-
-// UI chrome gets a subtle velocity-based lag while the grid moves.
-const CHROME_MAX_OFFSET = 9;
-const CHROME_VELOCITY_SCALE = 7;
-const CHROME_FOLLOW_EASE = 0.18;
-const CHROME_RETURN_MS = 340;
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
@@ -63,10 +57,8 @@ export function useInfiniteGrid() {
   const raf = useRef<number | null>(null); // inertia loop id
   const snapRaf = useRef<number | null>(null);
   const snapTimer = useRef<number | null>(null);
-  const chromeRaf = useRef<number | null>(null);
-  const chromeOffset = useRef({ x: 0, y: 0 });
-  const chromeTarget = useRef({ x: 0, y: 0 });
   const pinchActive = useRef(false);
+  const markerLit = useRef(false); // last reticle state, to avoid redundant writes
 
   // Write the current transform to the DOM and recompute the centered cell.
   const apply = useCallback(() => {
@@ -88,16 +80,21 @@ export function useInfiniteGrid() {
     const dx = Math.abs(localX - (col * CELL_W + CELL_W / 2));
     const dy = Math.abs(localY - (row * CELL_H + CELL_H / 2));
     const isOverImage = dx <= TILE_W / 2 && dy <= TILE_H / 2;
-    const m = markerRef.current;
-    if (m) {
-      m.style.opacity = isOverImage ? '0.9' : '0.25';
+    // Only touch the DOM when the lit state actually flips — writing the same
+    // opacity every frame still triggers a style recalc.
+    if (isOverImage !== markerLit.current) {
+      markerLit.current = isOverImage;
+      const m = markerRef.current;
+      if (m) m.style.opacity = isOverImage ? '0.9' : '0.25';
     }
 
     if (col !== centerRef.current.col || row !== centerRef.current.row) {
       centerRef.current = { col, row };
       setCenter({ col, row });
       // Light tactile "notch" as each item locks in (Android; no-op on iOS web).
-      navigator.vibrate?.(6);
+      // Skip during inertia: a fast fling crosses many items and would buzz
+      // continuously while adding main-thread work mid-glide.
+      if (raf.current == null) navigator.vibrate?.(6);
     }
   }, []);
 
@@ -119,75 +116,11 @@ export function useInfiniteGrid() {
     }
   };
 
-  const writeChromeOffset = (x: number, y: number) => {
-    chromeOffset.current = { x, y };
-    const el = chromeRef.current;
-    if (!el) return;
-    el.style.setProperty('--chrome-x', `${x.toFixed(2)}px`);
-    el.style.setProperty('--chrome-y', `${y.toFixed(2)}px`);
-  };
-
-  const stopChromeAnimation = () => {
-    if (chromeRaf.current != null) {
-      cancelAnimationFrame(chromeRaf.current);
-      chromeRaf.current = null;
-    }
-  };
-
-  const animateChromeTowardTarget = () => {
-    const step = () => {
-      const { x, y } = chromeOffset.current;
-      const target = chromeTarget.current;
-      const nextX = x + (target.x - x) * CHROME_FOLLOW_EASE;
-      const nextY = y + (target.y - y) * CHROME_FOLLOW_EASE;
-      writeChromeOffset(nextX, nextY);
-
-      if (Math.hypot(target.x - nextX, target.y - nextY) > 0.12) {
-        chromeRaf.current = requestAnimationFrame(step);
-      } else {
-        writeChromeOffset(target.x, target.y);
-        chromeRaf.current = null;
-      }
-    };
-
-    if (chromeRaf.current == null) {
-      chromeRaf.current = requestAnimationFrame(step);
-    }
-  };
-
-  const displaceChromeWithMotion = (motionX: number, motionY: number) => {
-    chromeTarget.current = {
-      x: clamp(-motionX * CHROME_VELOCITY_SCALE, -CHROME_MAX_OFFSET, CHROME_MAX_OFFSET),
-      y: clamp(-motionY * CHROME_VELOCITY_SCALE, -CHROME_MAX_OFFSET, CHROME_MAX_OFFSET),
-    };
-    animateChromeTowardTarget();
-  };
-
-  const returnChrome = () => {
-    stopChromeAnimation();
-    const startX = chromeOffset.current.x;
-    const startY = chromeOffset.current.y;
-    chromeTarget.current = { x: 0, y: 0 };
-    if (Math.hypot(startX, startY) < 0.1) {
-      writeChromeOffset(0, 0);
-      return;
-    }
-
-    const start = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / CHROME_RETURN_MS);
-      const eased = 1 - (1 - t) ** 3;
-      writeChromeOffset(startX * (1 - eased), startY * (1 - eased));
-
-      if (t < 1) {
-        chromeRaf.current = requestAnimationFrame(step);
-      } else {
-        chromeRaf.current = null;
-        writeChromeOffset(0, 0);
-      }
-    };
-
-    chromeRaf.current = requestAnimationFrame(step);
+  // While the grid is in motion: blur+fade the outfit preview and drop the
+  // expensive backdrop-filter/gradients on the header & dock (CSS keys off this
+  // class). Driven imperatively — a single class toggle, no React render here.
+  const setPanning = (panning: boolean) => {
+    chromeRef.current?.classList.toggle('is-panning', panning);
   };
 
   const nearestSnapTarget = () => {
@@ -258,7 +191,6 @@ export function useInfiniteGrid() {
       window.removeEventListener('resize', measure);
       stopInertia();
       stopSnap();
-      stopChromeAnimation();
     };
   }, [apply]);
 
@@ -271,12 +203,10 @@ export function useInfiniteGrid() {
         }
         stopInertia();
         stopSnap();
+        if (!last) setPanning(true);
         const start = (memo as { x: number; y: number }) ?? { x: tf.current.x, y: tf.current.y };
-        const previousX = tf.current.x;
-        const previousY = tf.current.y;
         tf.current.x = start.x + mx;
         tf.current.y = start.y + my;
-        displaceChromeWithMotion(Math.sign(tf.current.x - previousX) * vx, Math.sign(tf.current.y - previousY) * vy);
         apply();
 
         if (last) {
@@ -285,8 +215,8 @@ export function useInfiniteGrid() {
           let velY = clamp(dy * vy, -MAX_RELEASE_VELOCITY, MAX_RELEASE_VELOCITY);
 
           if (Math.hypot(velX, velY) <= INERTIA_STOP_VELOCITY) {
-            returnChrome();
             scheduleSnap();
+            setPanning(false);
             return start;
           }
 
@@ -301,7 +231,6 @@ export function useInfiniteGrid() {
             velY *= decay;
             tf.current.x += velX * dt;
             tf.current.y += velY * dt;
-            displaceChromeWithMotion(velX, velY);
             apply();
 
             const moving = Math.hypot(velX, velY) > INERTIA_STOP_VELOCITY;
@@ -310,8 +239,8 @@ export function useInfiniteGrid() {
               raf.current = requestAnimationFrame(step);
             } else {
               raf.current = null;
-              returnChrome();
               scheduleSnap();
+              setPanning(false);
             }
           };
           raf.current = requestAnimationFrame(step);
@@ -322,7 +251,7 @@ export function useInfiniteGrid() {
         pinchActive.current = true;
         stopInertia();
         stopSnap();
-        returnChrome();
+        setPanning(true);
       },
       onPinch: ({ offset: [s], origin: [ox, oy], memo }) => {
         const start = (memo as { x: number; y: number; s: number }) ?? {
@@ -343,6 +272,7 @@ export function useInfiniteGrid() {
         requestAnimationFrame(() => {
           pinchActive.current = false;
           scheduleSnap();
+          setPanning(false);
         });
       },
     },

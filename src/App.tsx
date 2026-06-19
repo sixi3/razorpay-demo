@@ -1,11 +1,12 @@
 import { Grid } from './components/Grid';
 import { Header } from './components/Header';
+import { OutfitStrip } from './components/OutfitStrip';
 import { QueryInput } from './components/QueryInput';
 import { useInfiniteGrid } from './grid/useInfiniteGrid';
 import './App.css';
 
 function App() {
-  const { bind, panRef, markerRef, chromeRef, cells } = useInfiniteGrid();
+  const { bind, panRef, markerRef, chromeRef, cells, centeredItem } = useInfiniteGrid();
 
   return (
     <div className="app" ref={chromeRef}>
@@ -15,6 +16,7 @@ function App() {
       <Header />
       <div className="dock-backdrop" aria-hidden="true" />
       <div className="app__dock">
+        <OutfitStrip item={centeredItem} />
         <QueryInput />
       </div>
     </div>
