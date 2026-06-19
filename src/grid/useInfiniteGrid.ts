@@ -26,7 +26,7 @@ const TILE_OFFSET_X = (CELL_W - TILE_W) / 2;
 const TILE_OFFSET_Y = (CELL_H - TILE_H) / 2;
 
 // Snap-to-item tuning. Radius is screen-space around the fixed reticle.
-const SNAP_RADIUS = 160;
+const SNAP_RADIUS_PADDING = 1;
 const SNAP_IDLE_MS = 100;
 const SNAP_DURATION_MS = 260;
 
@@ -137,9 +137,11 @@ export function useInfiniteGrid() {
     const itemX = col * CELL_W + CELL_W / 2;
     const itemY = row * CELL_H + CELL_H / 2;
     const distance = Math.hypot((localX - itemX) * s, (localY - itemY) * s);
+    const snapRadius = Math.hypot((CELL_W * s) / 2, (CELL_H * s) / 2) + SNAP_RADIUS_PADDING;
 
     return {
       distance,
+      snapRadius,
       x: vw / 2 - itemX * s,
       y: vh / 2 - itemY * s,
     };
@@ -175,7 +177,7 @@ export function useInfiniteGrid() {
       if (pinchActive.current || raf.current != null) return;
 
       const target = nearestSnapTarget();
-      if (target.distance > 1 && target.distance <= SNAP_RADIUS) {
+      if (target.distance > 1 && target.distance <= target.snapRadius) {
         animateTo(target.x, target.y);
       }
     }, SNAP_IDLE_MS);
