@@ -5,7 +5,6 @@ import {
   items,
   outfitFor,
   formatPrice,
-  discountPct,
   SIMILAR_PRODUCTS,
   type Item,
   type PieceCategory,
@@ -13,6 +12,7 @@ import {
 } from '../data/items';
 import type { TileRect } from '../grid/useInfiniteGrid';
 import { Header } from './Header';
+import { PdpMainPiece, PdpProduct } from './PdpBlock';
 import { QueryFab } from './QueryFab';
 
 // Carousel geometry: the active slide is centred and the neighbours peek in.
@@ -145,7 +145,6 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
   }
   const similar = SIMILAR_PRODUCTS[piece.category];
   const selectedSimilar = similar.find((s) => s.id === similarId) ?? null;
-  const similarOff = selectedSimilar ? discountPct(selectedSimilar) : 0;
 
   // The flying hero — a position:fixed copy of the model that animates between
   // the grid tile and the carousel. We animate the box itself (object-fit keeps
@@ -466,7 +465,6 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
     rawIndex,
     item: items[mod(rawIndex, itemCount)],
   }));
-  const off = discountPct(piece);
 
   return (
     <div className={`detail${entered ? ' detail--entered' : ''}${closing ? ' detail--closing' : ''}`}>
@@ -532,7 +530,11 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
             </button>
           </div>
 
-          <div className="drawer__pieces" role="tablist" aria-label="Outfit pieces">
+          <div
+            className={`drawer__pieces${outfit.pieces.length < 5 ? ' drawer__pieces--centered' : ''}`}
+            role="tablist"
+            aria-label="Outfit pieces"
+          >
             {outfit.pieces.map((p) => (
               <div className="piece" key={p.id}>
                 <button
@@ -549,138 +551,28 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
             ))}
           </div>
 
-          <div className="pdp">
-            <div className="pdp__media">
-              <img src={piece.imageUrl} alt={piece.name} draggable={false} />
-            </div>
-            <div className="pdp__info">
-              <span className="pdp__brand">{piece.brand}</span>
-              <h3 className="pdp__name">{piece.name}</h3>
-              <button className="pdp__rating" type="button">
-                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-                  <path
-                    d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
-                    fill="#f5a623"
-                  />
-                </svg>
-                <span>{piece.rating.toFixed(1)}</span>
-                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-                  <path
-                    d="M9 6l6 6-6 6"
-                    fill="none"
-                    stroke="#9bb0bf"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+          <PdpMainPiece product={piece} size={size} onSizeChange={setSize} />
 
-              <div className="pdp__price">
-                <span className="pdp__price-now">{formatPrice(piece.price)}</span>
-                {off > 0 && (
-                  <>
-                    <span className="pdp__price-mrp">{formatPrice(piece.mrp)}</span>
-                    <span className="pdp__price-off">{off}% OFF</span>
-                  </>
-                )}
+          <p className="drawer__similar-label">Similar Products</p>
+          <div className="drawer__similar">
+            {similar.map((s) => (
+              <div className="sim" key={s.id}>
+                <button
+                  className={`sim__chip${s.id === selectedSimilar?.id ? ' sim__chip--active' : ''}`}
+                  type="button"
+                  aria-label={similarProductLabel(s)}
+                  onClick={() => setSimilarId(s.id)}
+                >
+                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} />
+                </button>
+                <span className="sim__badge">{formatPrice(s.price)}</span>
               </div>
-
-              <span className="pdp__size-label">Select Size</span>
-              <div className="pdp__sizes">
-                {piece.sizes.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={`size-chip${s === size ? ' size-chip--active' : ''}`}
-                    onClick={() => setSize(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
 
-          <div className="pdp__actions">
-            <button className="pdp__goto" type="button">
-              Go to Product
-            </button>
-            <button className="pdp__cta" type="button">
-              Add to cart · {formatPrice(piece.price)}
-            </button>
-          </div>
+          {selectedSimilar && <PdpProduct product={selectedSimilar} />}
 
-	          <p className="drawer__similar-label">Similar Products</p>
-	          <div className="drawer__similar">
-	            {similar.map((s) => (
-	              <div className="sim" key={s.id}>
-	                <button
-	                  className={`sim__chip${s.id === selectedSimilar?.id ? ' sim__chip--active' : ''}`}
-	                  type="button"
-	                  aria-label={similarProductLabel(s)}
-	                  onClick={() => setSimilarId(s.id)}
-	                >
-	                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} />
-	                </button>
-	                <span className="sim__badge">{formatPrice(s.price)}</span>
-	              </div>
-	            ))}
-	          </div>
-
-	          {selectedSimilar && (
-	            <>
-	              <div className="pdp">
-	                <div className="pdp__media">
-	                  <img src={selectedSimilar.imageUrl} alt={selectedSimilar.name} draggable={false} />
-	                </div>
-	                <div className="pdp__info">
-	                  <span className="pdp__brand">{selectedSimilar.brand}</span>
-	                  <h3 className="pdp__name">{selectedSimilar.name}</h3>
-	                  <button className="pdp__rating" type="button">
-	                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-	                      <path
-	                        d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
-	                        fill="#f5a623"
-	                      />
-	                    </svg>
-	                    <span>{selectedSimilar.rating.toFixed(1)}</span>
-	                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-	                      <path
-	                        d="M9 6l6 6-6 6"
-	                        fill="none"
-	                        stroke="#9bb0bf"
-	                        strokeWidth="2"
-	                        strokeLinecap="round"
-	                        strokeLinejoin="round"
-	                      />
-	                    </svg>
-	                  </button>
-
-	                  <div className="pdp__price">
-	                    <span className="pdp__price-now">{formatPrice(selectedSimilar.price)}</span>
-	                    {similarOff > 0 && (
-	                      <>
-	                        <span className="pdp__price-mrp">{formatPrice(selectedSimilar.mrp)}</span>
-	                        <span className="pdp__price-off">{similarOff}% OFF</span>
-	                      </>
-	                    )}
-	                  </div>
-	                </div>
-	              </div>
-
-	              <div className="pdp__actions">
-	                <button className="pdp__goto" type="button">
-	                  Go to Product
-	                </button>
-	                <button className="pdp__cta" type="button">
-	                  Add to cart · {formatPrice(selectedSimilar.price)}
-	                </button>
-	              </div>
-	            </>
-	          )}
-
-	          {activeStylistRuns.map((stylistRun) => (
+          {activeStylistRuns.map((stylistRun) => (
 	            <section className="stylist-thread" aria-label="Stylist response" key={stylistRun.id}>
 	              <div className="stylist-thread__user">
 	                <div className="stylist-thread__bubble">{stylistRun.message}</div>
@@ -704,103 +596,54 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
 	              ) : (
 	                <div className="stylist-thread__response">
 	                  <p>{stylistRun.streamedText}</p>
-	                  {stylistRun.status === 'done' && (
-	                    (() => {
-	                      const selectedProduct =
-	                        STYLIST_PRODUCTS.find((product) => product.id === stylistRun.selectedProductId) ??
-	                        STYLIST_PRODUCTS[0];
-	                      const productOff = discountPct(selectedProduct);
-	                      const selectedCategory = stylistProductCategory(selectedProduct);
-	                      const selectedProductSimilar = SIMILAR_PRODUCTS[selectedCategory].filter(
-	                        (product) => product.id !== selectedProduct.id,
-	                      );
-	                      return (
-	                        <>
-	                          <div className="drawer__similar stylist-thread__products" aria-label="Curated products">
-	                            {STYLIST_PRODUCTS.map((product) => (
-	                              <div className="sim" key={product.id}>
-	                                <button
-	                                  className={`sim__chip${
-	                                    product.id === selectedProduct.id ? ' sim__chip--active' : ''
-	                                  }`}
-	                                  type="button"
-	                                  aria-label={similarProductLabel(product)}
-	                                  onClick={() => selectStylistProduct(activeItem.id, stylistRun.id, product.id)}
-	                                >
-	                                  <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
-	                                </button>
-	                                <span className="sim__badge">{formatPrice(product.price)}</span>
-	                              </div>
-	                            ))}
-	                          </div>
+                  {stylistRun.status === 'done' && (
+                    (() => {
+                      const selectedProduct =
+                        STYLIST_PRODUCTS.find((product) => product.id === stylistRun.selectedProductId) ??
+                        STYLIST_PRODUCTS[0];
+                      const selectedCategory = stylistProductCategory(selectedProduct);
+                      const selectedProductSimilar = SIMILAR_PRODUCTS[selectedCategory].filter(
+                        (product) => product.id !== selectedProduct.id,
+                      );
+                      return (
+                        <>
+                          <div className="drawer__similar stylist-thread__products" aria-label="Curated products">
+                            {STYLIST_PRODUCTS.map((product) => (
+                              <div className="sim" key={product.id}>
+                                <button
+                                  className={`sim__chip${
+                                    product.id === selectedProduct.id ? ' sim__chip--active' : ''
+                                  }`}
+                                  type="button"
+                                  aria-label={similarProductLabel(product)}
+                                  onClick={() => selectStylistProduct(activeItem.id, stylistRun.id, product.id)}
+                                >
+                                  <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
+                                </button>
+                                <span className="sim__badge">{formatPrice(product.price)}</span>
+                              </div>
+                            ))}
+                          </div>
 
-	                          <div>
-	                            <div className="pdp">
-	                              <div className="pdp__media">
-	                                <img src={selectedProduct.imageUrl} alt={selectedProduct.name} draggable={false} />
-	                              </div>
-	                              <div className="pdp__info">
-	                                <span className="pdp__brand">{selectedProduct.brand}</span>
-	                                <h3 className="pdp__name">{selectedProduct.name}</h3>
-	                                <button className="pdp__rating" type="button">
-	                                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-	                                    <path
-	                                      d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
-	                                      fill="#f5a623"
-	                                    />
-	                                  </svg>
-	                                  <span>{selectedProduct.rating.toFixed(1)}</span>
-	                                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-	                                    <path
-	                                      d="M9 6l6 6-6 6"
-	                                      fill="none"
-	                                      stroke="#9bb0bf"
-	                                      strokeWidth="2"
-	                                      strokeLinecap="round"
-	                                      strokeLinejoin="round"
-	                                    />
-	                                  </svg>
-	                                </button>
+                          <PdpProduct product={selectedProduct} />
 
-	                                <div className="pdp__price">
-	                                  <span className="pdp__price-now">{formatPrice(selectedProduct.price)}</span>
-	                                  {productOff > 0 && (
-	                                    <>
-	                                      <span className="pdp__price-mrp">{formatPrice(selectedProduct.mrp)}</span>
-	                                      <span className="pdp__price-off">{productOff}% OFF</span>
-	                                    </>
-	                                  )}
-	                                </div>
-	                              </div>
-	                            </div>
-
-	                            <div className="pdp__actions">
-	                              <button className="pdp__goto" type="button">
-	                                Go to Product
-	                              </button>
-	                              <button className="pdp__cta" type="button">
-	                                Add to cart · {formatPrice(selectedProduct.price)}
-	                              </button>
-	                            </div>
-
-	                            <div className="stylist-thread__related">
-	                              <p className="drawer__similar-label">Similar Products</p>
-	                              <div className="drawer__similar" aria-label={`${selectedProduct.name} similar products`}>
-	                                {selectedProductSimilar.map((product) => (
-	                                  <div className="sim" key={product.id}>
-	                                    <button className="sim__chip" type="button" aria-label={similarProductLabel(product)}>
-	                                      <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
-	                                    </button>
-	                                    <span className="sim__badge">{formatPrice(product.price)}</span>
-	                                  </div>
-	                                ))}
-	                              </div>
-	                            </div>
-	                          </div>
-	                        </>
-	                      );
-	                    })()
-	                  )}
+                          <div className="stylist-thread__related">
+                            <p className="drawer__similar-label">Similar Products</p>
+                            <div className="drawer__similar" aria-label={`${selectedProduct.name} similar products`}>
+                              {selectedProductSimilar.map((product) => (
+                                <div className="sim" key={product.id}>
+                                  <button className="sim__chip" type="button" aria-label={similarProductLabel(product)}>
+                                    <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
+                                  </button>
+                                  <span className="sim__badge">{formatPrice(product.price)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()
+                  )}
 	                </div>
 	              )}
 	            </section>
