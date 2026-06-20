@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTypingPlaceholder } from '../hooks/useTypingPlaceholder';
 
+interface QueryFabProps {
+  onSubmit?: (message: string) => void;
+}
+
 // Floating natural-language editor for the detail view. Collapsed it's a small
 // circle (a sparkle FAB); tapping expands it to a full-width input that floats
-// over the carousel. Visually inert in this version — this is the hook where
-// "swap the shoes" / "make it more casual" will reach the AI stylist later.
-export function QueryFab() {
+// over the carousel.
+export function QueryFab({ onSubmit }: QueryFabProps) {
   const [expanded, setExpanded] = useState(false);
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
@@ -47,10 +50,14 @@ export function QueryFab() {
     <form
       className={`qfab${expanded ? ' qfab--expanded' : ''}`}
       style={{ transform: kbOffset ? `translateY(${-kbOffset}px)` : undefined }}
-      onSubmit={(e) => {
-        e.preventDefault();
-        // intentionally inert in this version
-      }}
+	      onSubmit={(e) => {
+	        e.preventDefault();
+	        const message = value.trim();
+	        if (!message) return;
+	        onSubmit?.(message);
+	        setValue('');
+	        setExpanded(false);
+	      }}
     >
       <button
         className="qfab__lead"

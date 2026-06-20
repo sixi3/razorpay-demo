@@ -8,6 +8,8 @@ import {
   discountPct,
   SIMILAR_PRODUCTS,
   type Item,
+  type PieceCategory,
+  type SimilarProduct,
 } from '../data/items';
 import type { TileRect } from '../grid/useInfiniteGrid';
 import { Header } from './Header';
@@ -21,6 +23,22 @@ const SLIDE_FRAC = 1 - PEEK * 2; // active slide width as a fraction of viewport
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 const mod = (n: number, m: number) => ((n % m) + m) % m;
+const similarProductLabel = (product: SimilarProduct) => `${product.brand} ${product.name}`;
+const STYLIST_LOADING_STEPS = ['Thinking through the palette', 'Searching for products', 'Curating darker matches'];
+const STYLIST_RESPONSE =
+  'I kept the relaxed dinner silhouette, but shifted the palette deeper: charcoal trousers, a black leather loafer, a tobacco belt, and a richer neutral shirt. The result feels moodier without becoming formal.';
+const STYLIST_PRODUCTS: SimilarProduct[] = [
+  SIMILAR_PRODUCTS.Shirt[1],
+  SIMILAR_PRODUCTS.Trousers[4],
+  SIMILAR_PRODUCTS.Belt[0],
+  SIMILAR_PRODUCTS.Footwear[0],
+];
+const stylistProductCategory = (product: SimilarProduct): PieceCategory => {
+  const match = Object.entries(SIMILAR_PRODUCTS).find(([, products]) =>
+    products.some((candidate) => candidate.id === product.id),
+  );
+  return (match?.[0] as PieceCategory | undefined) ?? 'Shirt';
+};
 
 interface Metrics {
   vh: number;
@@ -30,6 +48,18 @@ interface Metrics {
 }
 
 type Detent = 'expanded' | 'collapsed' | 'peek';
+type StylistStatus = 'loading' | 'streaming' | 'done';
+
+interface StylistRun {
+  id: number;
+  message: string;
+  status: StylistStatus;
+  loadingStep: number;
+  streamedText: string;
+  selectedProductId: string;
+}
+
+type StylistRunsByItem = Record<number, StylistRun[]>;
 
 interface DetailViewProps {
   startItem: Item;
@@ -63,24 +93,36 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
   const [coupled, setCoupled] = useState(false);
   const [drawerScrolled, setDrawerScrolled] = useState(false); // top fade-mask toggle
   const [swiping, setSwiping] = useState(false); // brief blur when a snapped item commits
-  const swipeTimer = useRef<number | undefined>(undefined);
-  const commitFadeTimer = useRef<number | undefined>(undefined);
+  const [stylistRunsByItem, setStylistRunsByItem] = useState<StylistRunsByItem>({});
   const carouselIntent = useRef(false);
   const carouselIntentTimer = useRef<number | undefined>(undefined);
+  const carouselDragging = useRef(false); // a finger is currently down on the carousel
+  const settleRaf = useRef<number | undefined>(undefined); // settle-detection loop handle
+  const lastScrollLeft = useRef(0);
+  const stableFrames = useRef(0);
+  const stylistTimers = useRef<number[]>([]);
   const activeRawIndexRef = useRef(activeRawIndex);
   useEffect(() => {
     activeRawIndexRef.current = activeRawIndex;
   }, [activeRawIndex]);
   useEffect(() => {
+    const timers = stylistTimers.current;
     return () => {
-      if (swipeTimer.current) clearTimeout(swipeTimer.current);
-      if (commitFadeTimer.current) clearTimeout(commitFadeTimer.current);
       if (carouselIntentTimer.current) clearTimeout(carouselIntentTimer.current);
+      if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
+      timers.forEach((timer) => clearTimeout(timer));
     };
   }, []);
 
   const activeItem = items[activeIndex];
   const outfit = outfitFor(activeItem);
+  const activeStylistRuns = stylistRunsByItem[activeItem.id] ?? [];
+  const latestActiveStylistRun = activeStylistRuns[activeStylistRuns.length - 1];
+
+  useEffect(() => {
+    if (activeStylistRuns.length === 0 || !scrollRef.current) return;
+    scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [activeItem.id, activeStylistRuns.length, latestActiveStylistRun?.status, latestActiveStylistRun?.streamedText.length]);
 
   // Selected piece + size are reset when the outfit (carousel swipe) or piece
   // changes. Done by adjusting state during render via previous-value trackers
@@ -94,11 +136,16 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
   const piece = outfit.pieces.find((p) => p.id === pieceId) ?? outfit.pieces[0];
 
   const [size, setSize] = useState(piece.sizes[0]);
+  const [similarId, setSimilarId] = useState<string | null>(null);
   const [prevPieceId, setPrevPieceId] = useState(piece.id);
   if (piece.id !== prevPieceId) {
     setPrevPieceId(piece.id);
     setSize(piece.sizes[0]);
+    setSimilarId(null);
   }
+  const similar = SIMILAR_PRODUCTS[piece.category];
+  const selectedSimilar = similar.find((s) => s.id === similarId) ?? null;
+  const similarOff = selectedSimilar ? discountPct(selectedSimilar) : 0;
 
   // The flying hero — a position:fixed copy of the model that animates between
   // the grid tile and the carousel. We animate the box itself (object-fit keeps
@@ -170,6 +217,9 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
     requestAnimationFrame(() => setEntered(true));
   }, [trackW, metrics, activeRawIndex, originRect, flyApi, sheetApi]);
 
+  // Commit the carousel to the slide it has settled on. Driven by the settle
+  // detector below (not a fixed timeout), so the read always reflects the final
+  // resting position — never an intermediate frame mid-momentum.
   const finalizeCarouselSnap = () => {
     const track = trackRef.current;
     if (!track || !trackW) return;
@@ -182,41 +232,75 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
         ? itemCount + normalized
         : settledIdx;
 
-    if (swipeTimer.current) clearTimeout(swipeTimer.current);
+    // Recentre into the middle band so the carousel scrolls on forever. Within
+    // the middle band this writes the same value, so it never yanks the finger.
     track.scrollLeft = targetIdx * step;
 
     if (targetIdx !== activeRawIndexRef.current) {
-      if (commitFadeTimer.current) clearTimeout(commitFadeTimer.current);
-      setSwiping(true);
       activeRawIndexRef.current = targetIdx;
       setActiveRawIndex(targetIdx);
-      commitFadeTimer.current = window.setTimeout(() => {
-        setSwiping(false);
-      }, 120);
-    } else {
-      setSwiping(false);
     }
+    setSwiping(false); // reveal the (now matching) details right away
     carouselIntent.current = false;
+  };
+
+  // Wait for the scroll to actually stop — position stable across frames AND the
+  // finger lifted so momentum has run out — before committing. Replaces a fixed
+  // 160ms debounce that could fire while the carousel was still gliding and snap
+  // to the wrong slide.
+  const monitorSettle = () => {
+    const track = trackRef.current;
+    if (!track) {
+      settleRaf.current = undefined;
+      return;
+    }
+    const sl = track.scrollLeft;
+    if (Math.abs(sl - lastScrollLeft.current) <= 0.5) stableFrames.current += 1;
+    else stableFrames.current = 0;
+    lastScrollLeft.current = sl;
+
+    if (stableFrames.current >= 2 && !carouselDragging.current) {
+      settleRaf.current = undefined;
+      finalizeCarouselSnap();
+      return;
+    }
+    settleRaf.current = requestAnimationFrame(monitorSettle);
+  };
+
+  const armSettleMonitor = () => {
+    stableFrames.current = 0;
+    lastScrollLeft.current = trackRef.current?.scrollLeft ?? 0;
+    if (settleRaf.current == null) settleRaf.current = requestAnimationFrame(monitorSettle);
   };
 
   const onScroll = () => {
     const track = trackRef.current;
     if (!track || !trackW || !carouselIntent.current) return;
-
     setSwiping(true);
-    if (swipeTimer.current) clearTimeout(swipeTimer.current);
-    if (carouselIntentTimer.current) clearTimeout(carouselIntentTimer.current);
-    swipeTimer.current = window.setTimeout(finalizeCarouselSnap, 160);
+    armSettleMonitor();
   };
 
   const onCarouselIntent = () => {
     carouselIntent.current = true;
-    if (commitFadeTimer.current) clearTimeout(commitFadeTimer.current);
     if (carouselIntentTimer.current) clearTimeout(carouselIntentTimer.current);
     carouselIntentTimer.current = window.setTimeout(() => {
-      carouselIntent.current = false;
-      setSwiping(false);
+      // Pressed but never scrolled — drop the intent so a later programmatic
+      // scroll isn't mistaken for a swipe.
+      if (!carouselDragging.current) {
+        carouselIntent.current = false;
+        setSwiping(false);
+      }
     }, 900);
+  };
+
+  const onCarouselTouchStart = () => {
+    carouselDragging.current = true;
+    onCarouselIntent();
+  };
+
+  const onCarouselTouchEnd = () => {
+    carouselDragging.current = false;
+    armSettleMonitor(); // momentum may continue past lift-off; detect its end
   };
 
   const onDrawerScroll = () => {
@@ -233,6 +317,81 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
   const snapTo = (d: Detent) => {
     setDetent(d);
     sheetApi.start({ y: detentY(d), config: { tension: 320, friction: 34 } });
+  };
+
+  const queueStylistTimer = (fn: () => void, delay: number) => {
+    const timer = window.setTimeout(fn, delay);
+    stylistTimers.current.push(timer);
+  };
+
+  const updateStylistRun = (itemId: number, runId: number, update: (run: StylistRun) => StylistRun) => {
+    setStylistRunsByItem((runsByItem) => {
+      const runs = runsByItem[itemId] ?? [];
+      return {
+        ...runsByItem,
+        [itemId]: runs.map((run) => (run.id === runId ? update(run) : run)),
+      };
+    });
+  };
+
+  const startStylistResponse = (itemId: number, runId: number) => {
+    updateStylistRun(itemId, runId, (run) => ({
+      ...run,
+      status: 'streaming',
+      loadingStep: STYLIST_LOADING_STEPS.length - 1,
+    }));
+
+    Array.from(STYLIST_RESPONSE).forEach((_, index) => {
+      queueStylistTimer(() => {
+        updateStylistRun(itemId, runId, (run) => {
+          const streamedText = STYLIST_RESPONSE.slice(0, index + 1);
+          return {
+            ...run,
+            streamedText,
+            status: streamedText.length === STYLIST_RESPONSE.length ? 'done' : 'streaming',
+          };
+        });
+      }, index * 18);
+    });
+  };
+
+  const submitStylistQuery = (message: string) => {
+    const itemId = activeItem.id;
+    const runId = Date.now() + Math.round(Math.random() * 1000);
+    setStylistRunsByItem((runsByItem) => ({
+      ...runsByItem,
+      [itemId]: [
+        ...(runsByItem[itemId] ?? []),
+        {
+          id: runId,
+          message,
+          status: 'loading',
+          loadingStep: 0,
+          streamedText: '',
+          selectedProductId: STYLIST_PRODUCTS[0].id,
+        },
+      ],
+    }));
+    snapTo('expanded');
+
+    STYLIST_LOADING_STEPS.slice(1).forEach((_, index) => {
+      queueStylistTimer(() => {
+        updateStylistRun(itemId, runId, (run) => ({
+          ...run,
+          loadingStep: Math.min(index + 1, STYLIST_LOADING_STEPS.length - 1),
+        }));
+      }, (index + 1) * 650);
+    });
+    queueStylistTimer(() => startStylistResponse(itemId, runId), 2100);
+
+    requestAnimationFrame(() => {
+      const scroller = scrollRef.current;
+      if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    });
+  };
+
+  const selectStylistProduct = (itemId: number, runId: number, productId: string) => {
+    updateStylistRun(itemId, runId, (run) => ({ ...run, selectedProductId: productId }));
   };
 
   // Drag anywhere on the sheet to move it between detents, coordinated with the
@@ -281,6 +440,8 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
 
   const close = () => {
     if (closing) return;
+    if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
+    carouselIntent.current = false;
     setClosing(true);
     setEntered(false);
     setCoupled(false); // freeze the carousel height while the sheet slides away
@@ -305,7 +466,6 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
     rawIndex,
     item: items[mod(rawIndex, itemCount)],
   }));
-  const similar = SIMILAR_PRODUCTS[piece.category];
   const off = discountPct(piece);
 
   return (
@@ -326,7 +486,9 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
           ref={trackRef}
           onScroll={onScroll}
           onPointerDown={onCarouselIntent}
-          onTouchStart={onCarouselIntent}
+          onTouchStart={onCarouselTouchStart}
+          onTouchEnd={onCarouselTouchEnd}
+          onTouchCancel={onCarouselTouchEnd}
           onWheel={onCarouselIntent}
           style={trackW ? { paddingInline: peekPx } : undefined}
         >
@@ -372,16 +534,18 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
 
           <div className="drawer__pieces" role="tablist" aria-label="Outfit pieces">
             {outfit.pieces.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={p.id === piece.id}
-                className={`piece-chip${p.id === piece.id ? ' piece-chip--active' : ''}`}
-                onClick={() => setPieceId(p.id)}
-              >
-                <img className="piece-chip__img" src={p.imageUrl} alt={p.label} draggable={false} />
-              </button>
+              <div className="piece" key={p.id}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={p.id === piece.id}
+                  className={`piece-chip${p.id === piece.id ? ' piece-chip--active' : ''}`}
+                  onClick={() => setPieceId(p.id)}
+                >
+                  <img className="piece-chip__img" src={p.imageUrl} alt={p.label} draggable={false} />
+                </button>
+                <span className="piece-chip__badge">{formatPrice(p.price)}</span>
+              </div>
             ))}
           </div>
 
@@ -447,23 +611,206 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
             </button>
           </div>
 
-          <p className="drawer__similar-label">Similar Products</p>
-          <div className="drawer__similar">
-            {similar.map((s) => (
-              <div className="sim" key={s.id}>
-                <button className="sim__chip" type="button" aria-label={`${s.brand} ${s.name}`}>
-                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} />
-                </button>
-                <span className="sim__badge">{formatPrice(s.price)}</span>
-              </div>
-            ))}
-          </div>
-          </div>
-        </div>
-      </animated.div>
+	          <p className="drawer__similar-label">Similar Products</p>
+	          <div className="drawer__similar">
+	            {similar.map((s) => (
+	              <div className="sim" key={s.id}>
+	                <button
+	                  className={`sim__chip${s.id === selectedSimilar?.id ? ' sim__chip--active' : ''}`}
+	                  type="button"
+	                  aria-label={similarProductLabel(s)}
+	                  onClick={() => setSimilarId(s.id)}
+	                >
+	                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} />
+	                </button>
+	                <span className="sim__badge">{formatPrice(s.price)}</span>
+	              </div>
+	            ))}
+	          </div>
+
+	          {selectedSimilar && (
+	            <>
+	              <div className="pdp">
+	                <div className="pdp__media">
+	                  <img src={selectedSimilar.imageUrl} alt={selectedSimilar.name} draggable={false} />
+	                </div>
+	                <div className="pdp__info">
+	                  <span className="pdp__brand">{selectedSimilar.brand}</span>
+	                  <h3 className="pdp__name">{selectedSimilar.name}</h3>
+	                  <button className="pdp__rating" type="button">
+	                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+	                      <path
+	                        d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
+	                        fill="#f5a623"
+	                      />
+	                    </svg>
+	                    <span>{selectedSimilar.rating.toFixed(1)}</span>
+	                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+	                      <path
+	                        d="M9 6l6 6-6 6"
+	                        fill="none"
+	                        stroke="#9bb0bf"
+	                        strokeWidth="2"
+	                        strokeLinecap="round"
+	                        strokeLinejoin="round"
+	                      />
+	                    </svg>
+	                  </button>
+
+	                  <div className="pdp__price">
+	                    <span className="pdp__price-now">{formatPrice(selectedSimilar.price)}</span>
+	                    {similarOff > 0 && (
+	                      <>
+	                        <span className="pdp__price-mrp">{formatPrice(selectedSimilar.mrp)}</span>
+	                        <span className="pdp__price-off">{similarOff}% OFF</span>
+	                      </>
+	                    )}
+	                  </div>
+	                </div>
+	              </div>
+
+	              <div className="pdp__actions">
+	                <button className="pdp__goto" type="button">
+	                  Go to Product
+	                </button>
+	                <button className="pdp__cta" type="button">
+	                  Add to cart · {formatPrice(selectedSimilar.price)}
+	                </button>
+	              </div>
+	            </>
+	          )}
+
+	          {activeStylistRuns.map((stylistRun) => (
+	            <section className="stylist-thread" aria-label="Stylist response" key={stylistRun.id}>
+	              <div className="stylist-thread__user">
+	                <div className="stylist-thread__bubble">{stylistRun.message}</div>
+	                <span className="stylist-thread__avatar" aria-hidden="true">
+	                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+	                    <path
+	                      d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20c1.2-3.5 4-5.5 7.5-5.5s6.3 2 7.5 5.5"
+	                      stroke="currentColor"
+	                      strokeWidth="2"
+	                      strokeLinecap="round"
+	                    />
+	                  </svg>
+	                </span>
+	              </div>
+
+	              {stylistRun.status === 'loading' ? (
+	                <div className="stylist-thread__agent">
+	                  <span className="stylist-thread__loader" aria-hidden="true" />
+	                  <span>{STYLIST_LOADING_STEPS[stylistRun.loadingStep]}</span>
+	                </div>
+	              ) : (
+	                <div className="stylist-thread__response">
+	                  <p>{stylistRun.streamedText}</p>
+	                  {stylistRun.status === 'done' && (
+	                    (() => {
+	                      const selectedProduct =
+	                        STYLIST_PRODUCTS.find((product) => product.id === stylistRun.selectedProductId) ??
+	                        STYLIST_PRODUCTS[0];
+	                      const productOff = discountPct(selectedProduct);
+	                      const selectedCategory = stylistProductCategory(selectedProduct);
+	                      const selectedProductSimilar = SIMILAR_PRODUCTS[selectedCategory].filter(
+	                        (product) => product.id !== selectedProduct.id,
+	                      );
+	                      return (
+	                        <>
+	                          <div className="drawer__similar stylist-thread__products" aria-label="Curated products">
+	                            {STYLIST_PRODUCTS.map((product) => (
+	                              <div className="sim" key={product.id}>
+	                                <button
+	                                  className={`sim__chip${
+	                                    product.id === selectedProduct.id ? ' sim__chip--active' : ''
+	                                  }`}
+	                                  type="button"
+	                                  aria-label={similarProductLabel(product)}
+	                                  onClick={() => selectStylistProduct(activeItem.id, stylistRun.id, product.id)}
+	                                >
+	                                  <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
+	                                </button>
+	                                <span className="sim__badge">{formatPrice(product.price)}</span>
+	                              </div>
+	                            ))}
+	                          </div>
+
+	                          <div>
+	                            <div className="pdp">
+	                              <div className="pdp__media">
+	                                <img src={selectedProduct.imageUrl} alt={selectedProduct.name} draggable={false} />
+	                              </div>
+	                              <div className="pdp__info">
+	                                <span className="pdp__brand">{selectedProduct.brand}</span>
+	                                <h3 className="pdp__name">{selectedProduct.name}</h3>
+	                                <button className="pdp__rating" type="button">
+	                                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+	                                    <path
+	                                      d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
+	                                      fill="#f5a623"
+	                                    />
+	                                  </svg>
+	                                  <span>{selectedProduct.rating.toFixed(1)}</span>
+	                                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+	                                    <path
+	                                      d="M9 6l6 6-6 6"
+	                                      fill="none"
+	                                      stroke="#9bb0bf"
+	                                      strokeWidth="2"
+	                                      strokeLinecap="round"
+	                                      strokeLinejoin="round"
+	                                    />
+	                                  </svg>
+	                                </button>
+
+	                                <div className="pdp__price">
+	                                  <span className="pdp__price-now">{formatPrice(selectedProduct.price)}</span>
+	                                  {productOff > 0 && (
+	                                    <>
+	                                      <span className="pdp__price-mrp">{formatPrice(selectedProduct.mrp)}</span>
+	                                      <span className="pdp__price-off">{productOff}% OFF</span>
+	                                    </>
+	                                  )}
+	                                </div>
+	                              </div>
+	                            </div>
+
+	                            <div className="pdp__actions">
+	                              <button className="pdp__goto" type="button">
+	                                Go to Product
+	                              </button>
+	                              <button className="pdp__cta" type="button">
+	                                Add to cart · {formatPrice(selectedProduct.price)}
+	                              </button>
+	                            </div>
+
+	                            <div className="stylist-thread__related">
+	                              <p className="drawer__similar-label">Similar Products</p>
+	                              <div className="drawer__similar" aria-label={`${selectedProduct.name} similar products`}>
+	                                {selectedProductSimilar.map((product) => (
+	                                  <div className="sim" key={product.id}>
+	                                    <button className="sim__chip" type="button" aria-label={similarProductLabel(product)}>
+	                                      <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
+	                                    </button>
+	                                    <span className="sim__badge">{formatPrice(product.price)}</span>
+	                                  </div>
+	                                ))}
+	                              </div>
+	                            </div>
+	                          </div>
+	                        </>
+	                      );
+	                    })()
+	                  )}
+	                </div>
+	              )}
+	            </section>
+	          ))}
+	          </div>
+	        </div>
+	      </animated.div>
 
       {/* ---- Chrome: screen-anchored FAB, header + flying hero ---- */}
-      <QueryFab />
+      <QueryFab onSubmit={submitStylistQuery} />
       <Header onBack={close} />
 
       {flying && (
