@@ -243,41 +243,6 @@
   white-space: nowrap;
 }
 
-.weather-pill {
-  height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 999px;
-  color: #264254;
-  pointer-events: auto;
-}
-
-.weather-pill__icon {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  display: block;
-  object-fit: contain;
-}
-
-.weather-pill__stats {
-  display: flex;
-  align-items: baseline;
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.weather-pill__stats span:first-child {
-  font-size: 15px;
-}
-
-.weather-pill__stats--muted {
-  color: #758998;
-}
-
 /* ---- Blue blurred bottom section ---- */
 /* Sits behind the pill, blurs + blue-tints the grid items scrolling beneath.
    Masked so the blur fades out toward the top (no hard edge). */
@@ -550,4 +515,580 @@
 }
 .query__send--active .query__send-icon {
   transform: rotate(-45deg);
+}
+
+/* ===================================================================== */
+/* Detail view — model carousel (top) + outfit drawer (bottom)           */
+/* ===================================================================== */
+.detail {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #fff;
+  opacity: 1;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+.detail--closing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* In the detail view the back button is a pure "back" affordance — blur the
+   Ajio brand mark away. It fades + blurs back in on the grid (where the header
+   lives outside .detail and is unaffected). */
+.detail .header__back-logo {
+  transition: opacity 0.32s ease, filter 0.32s ease, width 0.32s ease, margin 0.32s ease;
+}
+.detail--entered .header__back-logo {
+  opacity: 0;
+  filter: blur(6px);
+  width: 0;
+  flex-basis: 0;
+}
+/* With the logo gone, collapse the pill to a clean circle with a centred
+   chevron (matching the other header buttons). */
+.detail .header__back-pill {
+  width: 40px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+.detail .header__back-pill .header__icon {
+  transform: none;
+}
+
+/* ---- Top: model carousel (fixed layer behind the sheet) ---- */
+/* Sits below the header; its `top` and `height` are driven inline from the
+   sheet position so the model enlarges as the sheet is dragged down. */
+.detail__stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.detail--entered .detail__stage {
+  opacity: 1;
+}
+
+.stage__track {
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overflow-anchor: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+.stage__track::-webkit-scrollbar {
+  display: none;
+}
+
+.stage__slide {
+  flex: 0 0 auto;
+  height: 100%;
+  scroll-snap-align: center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.slide__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  display: block;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* The flying shared-element model. Sits above the carousel layer but BELOW the
+   sheet (z-index 3) so the rising drawer cleanly covers it instead of the model
+   briefly painting over the sheet during the enter flight. */
+.detail__fly {
+  position: fixed;
+  z-index: 2;
+  object-fit: contain;
+  object-position: bottom center;
+  pointer-events: none;
+  will-change: left, top, width, height;
+}
+
+/* ---- Bottom: draggable outfit sheet ---- */
+/* A real bottom sheet: an absolutely-positioned panel whose top edge is driven
+   by a spring (translateY). Dragging the grip slides it up over the carousel
+   between two detents — collapsed (rest) and expanded (just under the header).
+   Height is set inline to (viewport - expandedY) so it fills to the bottom. */
+.detail__drawer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+  box-shadow: 0 -8px 30px rgba(38, 66, 84, 0.16);
+  will-change: transform;
+}
+
+/* Grabber handle — the fixed drag affordance at the top of the sheet. */
+.drawer__handle {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 5px;
+  margin: 10px auto 10px;
+  border-radius: 999px;
+  background: #dbe6ef;
+}
+
+/* Everything below the handle scrolls (title, description, CTA, details). */
+.drawer__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px 24px calc(104px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.drawer__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Blur + fade mask at the top of the scroller — appears once content scrolls,
+   softening it as it slides up under the grabber. */
+.drawer__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 19px;
+  height: 40px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.55) 35%, rgba(255, 255, 255, 0) 100%);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 35%, transparent 100%);
+}
+.detail__drawer--scrolled .drawer__fade {
+  opacity: 1;
+}
+
+/* Drawer content blurs out while swiping between outfits, sharpens back in. */
+.drawer__content {
+  transition: opacity 0.14s ease, filter 0.14s ease;
+}
+.detail__drawer--swiping .drawer__content {
+  opacity: 0;
+  filter: blur(8px);
+}
+
+.drawer__title {
+  margin: 0;
+  color: #1b3142;
+  font-family: 'Melodrama', Georgia, serif;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+.drawer__desc {
+  margin: 10px 0 0;
+  color: #6b7d8a;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Add-to-cart — full width, golden, under the description. */
+.drawer__cta-wrap {
+  padding: 20px 0 8px;
+}
+
+/* Piece chips — the constituent products; one is selected. */
+.drawer__pieces {
+  display: flex;
+  gap: 16px;
+  margin: 12px 0 16px;
+  padding: 8px 2px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.drawer__pieces::-webkit-scrollbar {
+  display: none;
+}
+.piece-chip {
+  position: relative;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1.5px solid #e9eef2;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.piece-chip--active {
+  border-color: #1b3142;
+  border-width: 2px;
+  box-shadow: 0 4px 12px rgba(27, 49, 66, 0.16);
+}
+.piece-chip__img {
+  position: absolute;
+  inset: 11px;
+  width: calc(100% - 22px);
+  height: calc(100% - 22px);
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* PDP — the selected piece's detail. */
+.pdp {
+  display: flex;
+  gap: 22px;
+  margin-top: 20px;
+}
+.pdp__media {
+  flex: 0 0 42%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+}
+.pdp__media img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
+.pdp__info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pdp__brand {
+  color: #8a99a5;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pdp__name {
+  margin: 6px 0 0;
+  color: #1b3142;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.pdp__rating {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #46606f;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pdp__price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+.pdp__price-now {
+  color: #1b3142;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.pdp__price-mrp {
+  color: #9bb0bf;
+  font-size: 15px;
+  text-decoration: line-through;
+}
+.pdp__price-off {
+  color: #1a8d4a;
+  font-size: 14px;
+  font-weight: 700;
+}
+.pdp__size-label {
+  margin: 22px 0 10px;
+  color: #8a99a5;
+  font-size: 14px;
+  font-weight: 600;
+}
+.pdp__sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.size-chip {
+  box-sizing: border-box;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #d7e0e7;
+  border-radius: 50%;
+  background: #fff;
+  color: #8a99a5;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.size-chip--active {
+  border-color: #264254;
+  background: #fff;
+  color: #1b3142;
+}
+
+/* Item actions — add to cart + go to product. */
+.pdp__actions {
+  display: flex;
+  gap: 12px;
+  margin: 28px 0 0;
+}
+
+/* Add to Cart — single item CTA. */
+.pdp__cta {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 18px;
+  border: none;
+  background: #264254;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.2s ease;
+}
+.pdp__cta:active {
+  transform: scale(0.985);
+  background: #1b3142;
+}
+
+.pdp__goto {
+  flex: 0 0 auto;
+  padding: 18px 20px;
+  border: 1.5px solid #264254;
+  background: #fff;
+  color: #264254;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.2s ease, color 0.2s ease;
+}
+.pdp__goto:active {
+  transform: scale(0.985);
+  background: rgba(38, 66, 84, 0.06);
+}
+
+/* Add to Cart — primary CTA. */
+.drawer__cta {
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  border: none;
+  background: #8a6d24;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.2s ease;
+}
+.drawer__cta:active {
+  transform: scale(0.985);
+  background: #765c1d;
+}
+
+/* Similar products rail. */
+.drawer__similar-label {
+  margin: 36px 0 8px;
+  color: #1b3142;
+  font-size: 16px;
+  font-weight: 700;
+}
+.drawer__similar {
+  display: flex;
+  gap: 18px;
+  padding: 8px 2px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.drawer__similar::-webkit-scrollbar {
+  display: none;
+}
+.sim {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sim__chip {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 1px solid #eef2f5;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(38, 66, 84, 0.1);
+  cursor: pointer;
+  overflow: hidden;
+}
+.sim__img {
+  position: absolute;
+  inset: 13px;
+  width: calc(100% - 26px);
+  height: calc(100% - 26px);
+  object-fit: contain;
+  pointer-events: none;
+}
+.sim__badge {
+  position: relative;
+  z-index: 1;
+  margin-top: -10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e3f2ff;
+  color: #264254;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---- Floating query FAB (collapsed circle -> full-width input) ---- */
+.qfab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1.5px solid rgba(227, 242, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 6px 18px rgba(38, 66, 84, 0.16);
+  overflow: hidden;
+  opacity: 0;
+  transition: width 0.36s cubic-bezier(0.2, 0.9, 0.2, 1), background 0.3s ease,
+    opacity 0.3s ease 0.06s, transform 0.25s ease;
+}
+.detail--entered .qfab {
+  opacity: 1;
+}
+.qfab--expanded {
+  width: calc(100vw - 32px);
+  background: rgba(255, 255, 255, 0.86);
+}
+.qfab__lead {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: #8a6d24;
+  cursor: pointer;
+}
+.qfab__field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.qfab--expanded .qfab__field {
+  opacity: 1;
+}
+.qfab__input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #2a2a33;
+  font-size: 16px;
+  padding: 0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.qfab__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  color: #8a8a93;
+  font-size: 16px;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+.qfab__placeholder--hidden {
+  opacity: 0;
+  filter: blur(4px);
+}
+.qfab__caret {
+  display: inline-block;
+  width: 1px;
+  height: 1.1em;
+  margin-left: 1px;
+  background: #8a8a93;
+  animation: query-caret-blink 1s step-end infinite;
+}
+.qfab__send {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  margin-right: 6px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(20, 20, 40, 0.06);
+  color: #4a4a55;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.25s ease, color 0.25s ease;
+}
+.qfab--expanded .qfab__send {
+  opacity: 1;
+}
+.qfab__send--active {
+  background: #1b3142;
+  color: #fff;
 }

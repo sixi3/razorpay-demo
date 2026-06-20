@@ -1,5 +1,3 @@
-import { WeatherPill } from './WeatherPill';
-
 function CaretLeftIcon() {
   return (
     <svg viewBox="0 0 256 256" aria-hidden="true" className="header__icon">
@@ -53,18 +51,21 @@ function HandbagIcon() {
   );
 }
 
-export function Header() {
+interface HeaderProps {
+  onBack?: () => void;
+}
+
+export function Header({ onBack }: HeaderProps) {
   return (
     <header className="app__header">
       <div className="header__brand">
-        <button className="header__back-pill" type="button" aria-label="Back">
+        <button className="header__back-pill" type="button" aria-label="Back" onClick={onBack}>
           <CaretLeftIcon />
           <img className="header__back-logo" src="/ajio-icon.png" alt="" draggable={false} />
         </button>
         <div className="header__title">Asta</div>
       </div>
       <div className="header__actions">
-        <WeatherPill />
         <button className="header__button" type="button" aria-label="Favorites">
           <HeartIcon />
         </button>

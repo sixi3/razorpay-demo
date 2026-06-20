@@ -30,6 +30,9 @@ const SNAP_RADIUS_PADDING = 1;
 const SNAP_IDLE_MS = 100;
 const SNAP_DURATION_MS = 260;
 
+// Max finger travel (px) still treated as a tap rather than a pan.
+const TAP_SLOP = 6;
+
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const itemAt = (col: number, row: number): Item =>
@@ -45,7 +48,16 @@ export interface Cell {
   isCenter: boolean;
 }
 
-export function useInfiniteGrid() {
+// On-screen rectangle of a tile's image box — handed to the detail view so it
+// can fly the selected model from exactly where it sat in the grid.
+export interface TileRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void) {
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [center, setCenter] = useState({ col: 0, row: 0 });
   const centerRef = useRef(center);
@@ -201,18 +213,54 @@ export function useInfiniteGrid() {
 
   const bind = useGesture(
     {
-      onDrag: ({ movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], pinching, last, cancel, memo }) => {
+      onDrag: ({ xy: [px, py], movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], pinching, last, cancel, memo }) => {
         if (pinching || pinchActive.current) {
           cancel();
           return;
         }
+        // Capture the start transform + whether a glide/snap was in flight when
+        // this gesture began (so a tap that merely halts a fling won't navigate).
+        // Detect taps by total movement rather than @use-gesture's `tap` flag,
+        // which can miss the very first gesture after mount.
+        const start = (memo as { x: number; y: number; fling: boolean }) ?? {
+          x: tf.current.x,
+          y: tf.current.y,
+          fling: raf.current != null || snapRaf.current != null,
+        };
         stopInertia();
         stopSnap();
-        if (!last) setPanning(true);
-        const start = (memo as { x: number; y: number }) ?? { x: tf.current.x, y: tf.current.y };
+
+        const moved = Math.hypot(mx, my);
+        if (moved > TAP_SLOP) setPanning(true);
         tf.current.x = start.x + mx;
         tf.current.y = start.y + my;
         apply();
+
+        if (last && moved <= TAP_SLOP) {
+          // A tap: open the tile under the finger (unless we just stopped a fling).
+          setPanning(false);
+          if (onSelect && !start.fling) {
+            const { x, y, s } = tf.current;
+            const localX = (px - x) / s;
+            const localY = (py - y) / s;
+            const col = Math.round((localX - CELL_W / 2) / CELL_W);
+            const row = Math.round((localY - CELL_H / 2) / CELL_H);
+            const cx = col * CELL_W + CELL_W / 2;
+            const cy = row * CELL_H + CELL_H / 2;
+            // Ignore taps that land in the gutter between tiles.
+            if (Math.abs(localX - cx) <= TILE_W / 2 && Math.abs(localY - cy) <= TILE_H / 2) {
+              const width = TILE_W * s;
+              const height = TILE_H * s;
+              onSelect(itemAt(col, row), {
+                left: cx * s + x - width / 2,
+                top: cy * s + y - height / 2,
+                width,
+                height,
+              });
+            }
+          }
+          return start;
+        }
 
         if (last) {
           // Project a short, decelerating glide from release velocity.
@@ -282,7 +330,7 @@ export function useInfiniteGrid() {
       },
     },
     {
-      drag: { filterTaps: true, pointer: { touch: true } },
+      drag: { pointer: { touch: true } },
       pinch: {
         scaleBounds: { min: MIN_ZOOM, max: MAX_ZOOM },
         rubberband: true,
