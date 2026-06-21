@@ -19,7 +19,9 @@ export function QueryFab({ onSubmit, autoExpanded = false }: QueryFabProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const expanded = manualExpanded || autoExpanded || value.length > 0 || focused;
-  const showPlaceholder = value.length === 0 && expanded && !focused;
+  // Keep the hint up while the field is open and empty — it stays through focus
+  // and only clears once the user actually types something.
+  const showPlaceholder = value.length === 0 && expanded;
 
   // Focus the field as it opens so the keyboard comes straight up.
   useEffect(() => {
@@ -53,6 +55,13 @@ export function QueryFab({ onSubmit, autoExpanded = false }: QueryFabProps) {
     <form
       className={`qfab${expanded ? ' qfab--expanded' : ''}`}
       style={{ transform: kbOffset ? `translateY(${-kbOffset}px)` : undefined }}
+      // Collapsed, the whole pill is the tap target: expand and focus the field
+      // synchronously (inside the gesture) so the keyboard reliably opens.
+      onClick={() => {
+        if (expanded) return;
+        setManualExpanded(true);
+        inputRef.current?.focus();
+      }}
 	      onSubmit={(e) => {
 	        e.preventDefault();
 	        const message = value.trim();
@@ -66,7 +75,6 @@ export function QueryFab({ onSubmit, autoExpanded = false }: QueryFabProps) {
         className="qfab__lead"
         type="button"
         aria-label={expanded ? 'Stylist' : 'Ask the stylist'}
-        onClick={() => setManualExpanded(true)}
         tabIndex={expanded ? -1 : 0}
       >
         <img
@@ -95,10 +103,7 @@ export function QueryFab({ onSubmit, autoExpanded = false }: QueryFabProps) {
           tabIndex={expanded ? 0 : -1}
         />
         {showPlaceholder && (
-          <span
-            className={`qfab__placeholder${focused ? ' qfab__placeholder--hidden' : ''}`}
-            aria-hidden="true"
-          >
+          <span className="qfab__placeholder" aria-hidden="true">
             {PLACEHOLDER}
           </span>
         )}

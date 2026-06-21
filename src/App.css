@@ -59,29 +59,28 @@
   transform: translateY(-10px);
 }
 
+/* Close-packed pyramid: centred flex rows, each one circle wider, so successive
+   rows nestle with the half-step offset of a triangular lattice. */
 .core-spokes-loader__matrix {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: repeat(7, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.core-spokes-loader__row {
+  display: flex;
   gap: 2px;
 }
 
 .core-spokes-loader__dot {
-  width: 4.5px;
-  height: 4.5px;
-  place-self: center;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
-  opacity: 0.08;
-  animation: core-spokes 900ms steps(6, end) infinite;
-  animation-delay: var(--dot-delay);
-}
-
-.core-spokes-loader__dot--inactive {
-  opacity: 0;
-  animation: none;
+  /* Base value before the rAF "updraft" loop drives each circle's opacity. */
+  opacity: 0.12;
+  will-change: opacity;
 }
 
 .core-spokes-loader__text {
@@ -124,43 +123,26 @@
   }
 }
 
-@keyframes core-spokes {
-  0%,
-  100% {
-    opacity: 0.08;
-    transform: scale(0.92);
-  }
-
-  50% {
-    opacity: var(--dot-peak);
-    transform: scale(1.16);
-  }
-}
-
 .core-spokes-loader--compact {
-  flex: 0 0 22px;
+  flex: 0 0 auto;
   gap: 0;
   transform: none;
 }
 
 .core-spokes-loader--compact .core-spokes-loader__matrix {
-  width: 22px;
-  height: 22px;
-  gap: 1px;
+  gap: 1.5px;
+}
+
+.core-spokes-loader--compact .core-spokes-loader__row {
+  gap: 1.5px;
 }
 
 .core-spokes-loader--compact .core-spokes-loader__dot {
-  width: 2.5px;
-  height: 2.5px;
+  width: 4px;
+  height: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .core-spokes-loader__dot {
-    animation: none;
-    opacity: var(--dot-peak);
-    transform: scale(1);
-  }
-
   .core-spokes-loader__text--cycling {
     animation: none;
     opacity: 1;
