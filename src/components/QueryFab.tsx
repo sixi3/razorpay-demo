@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { compressedImage } from '../data/items';
 
 const PLACEHOLDER = 'Describe an outfit change you want';
 
@@ -70,7 +71,7 @@ export function QueryFab({ onSubmit, autoExpanded = false }: QueryFabProps) {
       >
         <img
           className="qfab__lead-icon"
-          src="/assistant-icon.png"
+          src={compressedImage('/assistant-icon.png')}
           alt=""
           aria-hidden="true"
           draggable={false}

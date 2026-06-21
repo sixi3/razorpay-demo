@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { compressedImage } from '../data/items';
 import './Onboarding.css';
 
 /* ---- Icons ---- */
@@ -171,16 +172,16 @@ interface ShapeOption {
 // Body-shape options per wear. Labels mirror the image file names.
 const SHAPES: Record<Wear, ShapeOption[]> = {
   womenswear: [
-    { id: 'hourglass', label: 'Hourglass', img: '/women-figures/hourglass.png' },
-    { id: 'pear', label: 'Pear', img: '/women-figures/pear.png' },
-    { id: 'apple', label: 'Apple', img: '/women-figures/apple.png' },
-    { id: 'rectangle', label: 'Rectangle', img: '/women-figures/rectangle.png' },
+    { id: 'hourglass', label: 'Hourglass', img: compressedImage('/women-figures/hourglass.png') },
+    { id: 'pear', label: 'Pear', img: compressedImage('/women-figures/pear.png') },
+    { id: 'apple', label: 'Apple', img: compressedImage('/women-figures/apple.png') },
+    { id: 'rectangle', label: 'Rectangle', img: compressedImage('/women-figures/rectangle.png') },
   ],
   menswear: [
-    { id: 'triangle', label: 'Triangle', img: '/men-figures/triangle.png' },
-    { id: 'inverted-triangle', label: 'Inverted Triangle', img: '/men-figures/inverted-triangle.png' },
-    { id: 'rectangle', label: 'Rectangle', img: '/men-figures/rectangle.png' },
-    { id: 'round', label: 'Round', img: '/men-figures/round.png' },
+    { id: 'triangle', label: 'Triangle', img: compressedImage('/men-figures/triangle.png') },
+    { id: 'inverted-triangle', label: 'Inverted Triangle', img: compressedImage('/men-figures/inverted-triangle.png') },
+    { id: 'rectangle', label: 'Rectangle', img: compressedImage('/men-figures/rectangle.png') },
+    { id: 'round', label: 'Round', img: compressedImage('/men-figures/round.png') },
   ],
 };
 

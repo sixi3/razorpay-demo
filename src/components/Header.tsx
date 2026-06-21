@@ -1,3 +1,5 @@
+import { compressedImage } from '../data/items';
+
 function CaretLeftIcon() {
   return (
     <svg viewBox="0 0 256 256" aria-hidden="true" className="header__icon">
@@ -66,7 +68,7 @@ export function Header({ onBack, bagCount = 0, bagPulseKey = 0 }: HeaderProps) {
       <div className="header__brand">
         <button className="header__back-pill" type="button" aria-label="Back" onClick={onBack}>
           <CaretLeftIcon />
-          <img className="header__back-logo" src="/ajio-icon.png" alt="" draggable={false} />
+          <img className="header__back-logo" src={compressedImage('/ajio-icon.png')} alt="" draggable={false} />
         </button>
         <div className="header__title">Nova</div>
       </div>

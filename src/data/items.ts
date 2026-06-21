@@ -77,9 +77,12 @@ export const OCCASION_META: Record<Occasion, OccasionMeta> = {
   },
 };
 
-const gridModelImage = (modelImage: string) => `/grid-models${modelImage}`;
-const detailModelImage = (modelImage: string) => `/detail-models${modelImage}`;
-export const previewProductImage = (imageUrl: string) => `/preview-products${imageUrl}`;
+const sourceImagePath = (imageUrl: string) => imageUrl.replace(/^\/compressed/, '');
+export const compressedImage = (imageUrl: string) => `/compressed${sourceImagePath(imageUrl)}`;
+const gridModelImage = (modelImage: string) => compressedImage(`/grid-models${modelImage}`);
+const detailModelImage = (modelImage: string) => compressedImage(`/detail-models${modelImage}`);
+export const previewProductImage = (imageUrl: string) =>
+  compressedImage(`/preview-products${sourceImagePath(imageUrl)}`);
 
 // A small curated price spread per occasion so the grid bubble feels intentional.
 const PRICE_BANDS: Record<Occasion, [number, number]> = {
@@ -124,7 +127,7 @@ export const items: Item[] = Array.from({ length: COUNT }, (_, i) => {
     id: i,
     // The tile hero is the occasion's model shot, which the detail carousel
     // flies from; cycling occasions puts all seven models across the grid.
-    imageUrl: OCCASION_META[occasion].modelImage,
+    imageUrl: compressedImage(OCCASION_META[occasion].modelImage),
     gridImageUrl: gridModelImage(OCCASION_META[occasion].modelImage),
     occasion,
     price: priceFor(occasion, i + 1),
@@ -766,7 +769,7 @@ export const SIMILAR_PRODUCTS: Record<PieceCategory, SimilarProduct[]> = Object.
         ...product,
         // Cycle the real cross-outfit shots so the rail mixes-and-matches the
         // actual articles instead of repeating a single image.
-        imageUrl: images[i % images.length],
+        imageUrl: compressedImage(images[i % images.length]),
         previewImageUrl: previewProductImage(images[i % images.length]),
       })),
     ];
@@ -788,7 +791,10 @@ export interface Outfit {
 
 export function outfitFor(item: Item): Outfit {
   const meta = OCCASION_META[item.occasion];
-  const pieces = OUTFIT_PIECES[item.occasion];
+  const pieces = OUTFIT_PIECES[item.occasion].map((piece) => ({
+    ...piece,
+    imageUrl: compressedImage(piece.imageUrl),
+  }));
   const total = pieces.reduce((sum, p) => sum + p.price, 0);
   const mrpTotal = pieces.reduce((sum, p) => sum + p.mrp, 0);
   return {
