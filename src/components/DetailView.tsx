@@ -5,6 +5,7 @@ import {
   items,
   outfitFor,
   formatPrice,
+  previewProductImage,
   SIMILAR_PRODUCTS,
   type Item,
   type PieceCategory,
@@ -582,7 +583,7 @@ export function DetailView({
                 >
                   <img
                     className="piece-chip__img"
-                    src={p.imageUrl}
+                    src={previewProductImage(p.imageUrl)}
                     alt={p.label}
                     draggable={false}
                     decoding="async"
@@ -606,7 +607,14 @@ export function DetailView({
                   aria-label={similarProductLabel(s)}
                   onClick={() => setSimilarId(s.id)}
                 >
-                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} decoding="async" loading="lazy" />
+                  <img
+                    className="sim__img"
+                    src={s.previewImageUrl}
+                    alt={s.name}
+                    draggable={false}
+                    decoding="async"
+                    loading="lazy"
+                  />
                 </button>
                 <span className="sim__badge">{formatPrice(s.price)}</span>
               </div>
@@ -667,7 +675,7 @@ export function DetailView({
                                 >
                                   <img
                                     className="sim__img"
-                                    src={product.imageUrl}
+                                    src={product.previewImageUrl}
                                     alt={product.name}
                                     draggable={false}
                                     decoding="async"
@@ -689,7 +697,7 @@ export function DetailView({
                                   <button className="sim__chip" type="button" aria-label={similarProductLabel(product)}>
                                     <img
                                       className="sim__img"
-                                      src={product.imageUrl}
+                                      src={product.previewImageUrl}
                                       alt={product.name}
                                       draggable={false}
                                       decoding="async"

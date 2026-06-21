@@ -1,4 +1,4 @@
-import { outfitFor, formatPrice, type Item } from '../data/items';
+import { outfitFor, formatPrice, previewProductImage, type Item } from '../data/items';
 
 interface OutfitStripProps {
   item: Item;
@@ -22,7 +22,7 @@ export function OutfitStrip({ item, onSelectPiece }: OutfitStripProps) {
             >
               <img
                 className="preview__chip-img"
-                src={piece.imageUrl}
+                src={previewProductImage(piece.imageUrl)}
                 alt={piece.label}
                 draggable={false}
                 decoding="async"

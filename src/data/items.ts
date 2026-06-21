@@ -78,6 +78,8 @@ export const OCCASION_META: Record<Occasion, OccasionMeta> = {
 };
 
 const gridModelImage = (modelImage: string) => `/grid-models${modelImage}`;
+const detailModelImage = (modelImage: string) => `/detail-models${modelImage}`;
+export const previewProductImage = (imageUrl: string) => `/preview-products${imageUrl}`;
 
 // A small curated price spread per occasion so the grid bubble feels intentional.
 const PRICE_BANDS: Record<Occasion, [number, number]> = {
@@ -653,6 +655,7 @@ export interface SimilarProduct {
   brand: string;
   name: string;
   imageUrl: string;
+  previewImageUrl: string;
   price: number;
   mrp: number;
   rating: number;
@@ -672,7 +675,7 @@ const CATEGORY_IMAGES: Record<PieceCategory, string[]> = (() => {
 
 // Curated brand alternatives per category (imagery is attached below by cycling
 // through CATEGORY_IMAGES so each card shows a real, different garment).
-const CURATED_SIMILAR: Record<PieceCategory, Omit<SimilarProduct, 'imageUrl'>[]> = {
+const CURATED_SIMILAR: Record<PieceCategory, Omit<SimilarProduct, 'imageUrl' | 'previewImageUrl'>[]> = {
   Eyewear: [
     { id: 'eye-1', brand: 'Vincent Chase', name: 'Polarized Round Sunglasses', price: 1200, mrp: 3000, rating: 4.3 },
     { id: 'eye-2', brand: 'Ray-Ban', name: 'Round Metal Classic', price: 6790, mrp: 8990, rating: 4.6 },
@@ -764,6 +767,7 @@ export const SIMILAR_PRODUCTS: Record<PieceCategory, SimilarProduct[]> = Object.
         // Cycle the real cross-outfit shots so the rail mixes-and-matches the
         // actual articles instead of repeating a single image.
         imageUrl: images[i % images.length],
+        previewImageUrl: previewProductImage(images[i % images.length]),
       })),
     ];
   }),
@@ -790,7 +794,7 @@ export function outfitFor(item: Item): Outfit {
   return {
     occasion: item.occasion,
     description: meta.description,
-    modelImage: meta.modelImage,
+    modelImage: detailModelImage(meta.modelImage),
     pieces,
     total,
     mrpTotal,
