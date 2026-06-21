@@ -1,27 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTypingPlaceholder } from '../hooks/useTypingPlaceholder';
+
+const PLACEHOLDER = 'Describe an outfit change you want';
 
 interface QueryFabProps {
   onSubmit?: (message: string) => void;
+  autoExpanded?: boolean;
 }
 
 // Floating natural-language editor for the detail view. Collapsed it's a small
 // circle (a sparkle FAB); tapping expands it to a full-width input that floats
 // over the carousel.
-export function QueryFab({ onSubmit }: QueryFabProps) {
-  const [expanded, setExpanded] = useState(false);
+export function QueryFab({ onSubmit, autoExpanded = false }: QueryFabProps) {
+  const [manualExpanded, setManualExpanded] = useState(false);
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [kbOffset, setKbOffset] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const showPlaceholder = value.length === 0;
-  const placeholder = useTypingPlaceholder(expanded && showPlaceholder && !focused);
+  const expanded = manualExpanded || autoExpanded || value.length > 0 || focused;
+  const showPlaceholder = value.length === 0 && expanded && !focused;
 
   // Focus the field as it opens so the keyboard comes straight up.
   useEffect(() => {
-    if (expanded) inputRef.current?.focus();
-  }, [expanded]);
+    if (manualExpanded) inputRef.current?.focus();
+  }, [manualExpanded]);
 
   // Ride above the on-screen keyboard. The visual viewport shrinks when the
   // keyboard shows; the leftover gap at the bottom is its height. A fixed FAB
@@ -31,7 +33,7 @@ export function QueryFab({ onSubmit }: QueryFabProps) {
     if (!vv) return;
     const update = () => {
       const gap = window.innerHeight - vv.height - vv.offsetTop;
-      setKbOffset(expanded ? Math.max(0, Math.round(gap)) : 0);
+      setKbOffset(focused ? Math.max(0, Math.round(gap)) : 0);
     };
     update();
     vv.addEventListener('resize', update);
@@ -40,10 +42,10 @@ export function QueryFab({ onSubmit }: QueryFabProps) {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
     };
-  }, [expanded]);
+  }, [focused]);
 
   const collapse = () => {
-    if (value.length === 0) setExpanded(false);
+    if (value.length === 0) setManualExpanded(false);
   };
 
   return (
@@ -56,23 +58,23 @@ export function QueryFab({ onSubmit }: QueryFabProps) {
 	        if (!message) return;
 	        onSubmit?.(message);
 	        setValue('');
-	        setExpanded(false);
+	        setManualExpanded(false);
 	      }}
     >
       <button
         className="qfab__lead"
         type="button"
         aria-label={expanded ? 'Stylist' : 'Ask the stylist'}
-        onClick={() => !expanded && setExpanded(true)}
+        onClick={() => setManualExpanded(true)}
         tabIndex={expanded ? -1 : 0}
       >
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
-          <path
-            d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4L12 3Z"
-            fill="currentColor"
-          />
-          <path d="M19 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2Z" fill="currentColor" />
-        </svg>
+        <img
+          className="qfab__lead-icon"
+          src="/assistant-icon.png"
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+        />
       </button>
 
       <div className="qfab__field">
@@ -96,8 +98,7 @@ export function QueryFab({ onSubmit }: QueryFabProps) {
             className={`qfab__placeholder${focused ? ' qfab__placeholder--hidden' : ''}`}
             aria-hidden="true"
           >
-            {placeholder}
-            <span className="qfab__caret" />
+            {PLACEHOLDER}
           </span>
         )}
       </div>

@@ -41,13 +41,13 @@ function PdpDetails({ product }: { product: PdpProductLike }) {
   );
 }
 
-function PdpActions({ price }: { price: number }) {
+function PdpActions({ price, onAddToBag }: { price: number; onAddToBag: () => void }) {
   return (
     <div className="pdp__actions">
       <button className="pdp__goto" type="button">
         Go to Product
       </button>
-      <button className="pdp__cta" type="button">
+      <button className="pdp__cta" type="button" onClick={() => onAddToBag()}>
         Add to bag · {formatPrice(price)}
       </button>
     </div>
@@ -59,10 +59,12 @@ export function PdpMainPiece({
   product,
   size,
   onSizeChange,
+  onAddToBag,
 }: {
   product: Piece;
   size: string;
   onSizeChange: (size: string) => void;
+  onAddToBag: () => void;
 }) {
   return (
     <>
@@ -89,13 +91,13 @@ export function PdpMainPiece({
         </div>
       </div>
 
-      <PdpActions price={product.price} />
+      <PdpActions price={product.price} onAddToBag={onAddToBag} />
     </>
   );
 }
 
 /** Similar / stylist pick — same PDP block without size selector. */
-export function PdpProduct({ product }: { product: PdpProductLike }) {
+export function PdpProduct({ product, onAddToBag }: { product: PdpProductLike; onAddToBag: () => void }) {
   return (
     <>
       <div className="pdp">
@@ -107,7 +109,7 @@ export function PdpProduct({ product }: { product: PdpProductLike }) {
         </div>
       </div>
 
-      <PdpActions price={product.price} />
+      <PdpActions price={product.price} onAddToBag={onAddToBag} />
     </>
   );
 }

@@ -1,0 +1,243 @@
+/* ============================================================= */
+/* First-run walkthrough — full-screen dark overlay with grey text */
+/* laid directly on top (no cards). Step 1 demos panning (looping   */
+/* hand gesture); step 2 lifts the query input above the overlay    */
+/* and points grey copy + a chevron at it.                          */
+/* ============================================================= */
+.wt {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.32s ease;
+  font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+.wt--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Step 2: the dark overlay covers the whole screen; instead of cutting a hole
+   in it (whose soft edge bled the bright grid through as a halo), we lift the
+   query input above the overlay so the overlay simply sits behind it. The strip
+   of outfit chips is hidden, and the bar is made solid so it reads on the dark. */
+body.wt-step2 .app__dock {
+  z-index: 60;
+}
+body.wt-step2 .preview {
+  display: none;
+}
+body.wt-step2 .query {
+  background: #fff;
+  box-shadow: none;
+  /* Let "tap anywhere" reach the overlay and dismiss, rather than focusing the
+     input through the walkthrough. The real bar is interactive again after. */
+  pointer-events: none;
+}
+
+/* Solid dark veil over the grid, edge to edge. */
+.wt__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 14, 18, 0.74);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: wt-scrim-in 0.4s ease both;
+}
+@keyframes wt-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Text + gesture blur/fade together when stepping. */
+.wt__content {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 1;
+  filter: blur(0);
+  transition: opacity 0.32s ease, filter 0.32s ease;
+  will-change: opacity, filter;
+}
+.wt__content--out {
+  opacity: 0;
+  filter: blur(10px);
+}
+
+/* ---- Text block (no card — grey type straight on the dark) ---- */
+.wt__copy {
+  pointer-events: none;
+  max-width: 300px;
+}
+.wt__copy--center {
+  text-align: center;
+}
+.wt__dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.wt__copy--center .wt__dots {
+  justify-content: center;
+}
+.wt__dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.wt__dots i.is-on {
+  width: 20px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.85);
+}
+.wt__title {
+  margin: 0;
+  color: #e6e9ec;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.wt__body {
+  margin: 10px 0 0;
+  color: #9aa3ab;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wt__hint {
+  display: block;
+  margin-top: 18px;
+  color: #6b747c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- Step 1 layout ---- */
+.wt__pan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 46%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 38px;
+  padding: 0 32px;
+}
+
+/* Looping touch/drag demo — light puck so it reads on the dark veil. */
+.wt__gesture {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+.wt__touch {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  color: #1b2730;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  animation: wt-drag 2.4s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+.wt__ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  animation: wt-ripple 2.4s ease-out infinite;
+}
+@keyframes wt-drag {
+  0% {
+    transform: translate(-46px, -34px) scale(0.7);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(-46px, -34px) scale(1);
+    opacity: 1;
+  }
+  46% {
+    transform: translate(46px, 34px) scale(1);
+    opacity: 1;
+  }
+  56% {
+    transform: translate(46px, 34px) scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-46px, -34px) scale(0.7);
+    opacity: 0;
+  }
+}
+@keyframes wt-ripple {
+  0%,
+  8% {
+    transform: translate(-46px, -34px) scale(0.6);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-46px, -34px) scale(0.6);
+    opacity: 0.5;
+  }
+  32% {
+    transform: translate(-46px, -34px) scale(1.9);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- Step 2 layout ---- */
+.wt__drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 32px;
+}
+/* White chevron under the copy, nudging the eye down to the lit query bar. */
+.wt__point {
+  margin-top: 14px;
+  color: #fff;
+  animation: wt-bob 1.5s ease-in-out infinite;
+}
+@keyframes wt-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wt__touch,
+  .wt__ripple,
+  .wt__point {
+    animation: none;
+  }
+}

@@ -69,6 +69,8 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
   const raf = useRef<number | null>(null); // inertia loop id
   const snapRaf = useRef<number | null>(null);
   const snapTimer = useRef<number | null>(null);
+  const driftRaf = useRef<number | null>(null);
+  const driftActive = useRef(false);
   const pinchActive = useRef(false);
   const markerLit = useRef(false); // last reticle state, to avoid redundant writes
 
@@ -109,7 +111,7 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
       // Light tactile "notch" as each item locks in (Android; no-op on iOS web).
       // Skip during inertia: a fast fling crosses many items and would buzz
       // continuously while adding main-thread work mid-glide.
-      if (raf.current == null) navigator.vibrate?.(6);
+      if (raf.current == null && !driftActive.current) navigator.vibrate?.(6);
     }
   }, []);
 
@@ -195,6 +197,39 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
     }, SNAP_IDLE_MS);
   };
 
+  // Autonomous "discover" drift for the onboarding walkthrough: gently orbits
+  // the grid so tiles glide past on their own, previewing what a pan does. No
+  // snap or haptics while it runs; settles onto the nearest item when stopped.
+  // Wrapped in a stable ref object so consumers can hold a constant identity
+  // while the closures pick up the latest transform each render.
+  const demoDriftRef = useRef<{ start: () => void; stop: () => void }>({ start() {}, stop() {} });
+  demoDriftRef.current.start = () => {
+    if (driftActive.current) return;
+    driftActive.current = true;
+    stopInertia();
+    stopSnap();
+    const baseX = tf.current.x;
+    const baseY = tf.current.y;
+    const t0 = performance.now();
+    const loop = (now: number) => {
+      const t = (now - t0) / 1000;
+      tf.current.x = baseX + Math.sin(t * 0.55) * CELL_W * 0.92;
+      tf.current.y = baseY + Math.sin(t * 0.43 + 1.1) * CELL_H * 0.6;
+      apply();
+      driftRaf.current = requestAnimationFrame(loop);
+    };
+    driftRaf.current = requestAnimationFrame(loop);
+  };
+  demoDriftRef.current.stop = () => {
+    if (!driftActive.current) return;
+    driftActive.current = false;
+    if (driftRaf.current != null) {
+      cancelAnimationFrame(driftRaf.current);
+      driftRaf.current = null;
+    }
+    scheduleSnap();
+  };
+
   // Initialise: measure viewport and centre cell (0,0) before first paint.
   useLayoutEffect(() => {
     const measure = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -208,6 +243,7 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
       window.removeEventListener('resize', measure);
       stopInertia();
       stopSnap();
+      if (driftRaf.current != null) cancelAnimationFrame(driftRaf.current);
     };
   }, [apply]);
 
@@ -363,5 +399,14 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
 
   const centeredItem = itemAt(center.col, center.row);
 
-  return { bind, panRef, markerRef, chromeRef, cells, centeredItem, ready: viewport.w > 0 };
+  return {
+    bind,
+    panRef,
+    markerRef,
+    chromeRef,
+    cells,
+    centeredItem,
+    ready: viewport.w > 0,
+    demoDrift: demoDriftRef.current,
+  };
 }

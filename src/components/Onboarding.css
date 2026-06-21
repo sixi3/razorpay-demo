@@ -1,0 +1,472 @@
+/* ============================================================= */
+/* Onboarding — light blue surfaces (#E3F2FF) with deep teal     */
+/* accents (#264254) on icons and buttons.                         */
+/* ============================================================= */
+.ob {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #fff;
+  color: #264254;
+  font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  /* Whole overlay can fade out when the flow finishes. */
+  opacity: 1;
+  transition: opacity 0.32s ease;
+}
+.ob--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The cross-fade wrapper: every screen's content blurs + fades + rises
+   as a single unit when stepping between screens. */
+.ob__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
+  transition:
+    opacity 0.34s ease,
+    filter 0.34s ease,
+    transform 0.34s ease;
+  will-change: opacity, filter, transform;
+}
+.ob__content--out {
+  opacity: 0;
+  filter: blur(14px);
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.ob__screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 28px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+/* ---- Top bar (back / skip) ---- */
+.ob__topbar {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ob__back {
+  width: 40px;
+  height: 40px;
+  margin-left: -8px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: #264254;
+  cursor: pointer;
+}
+.ob__back svg {
+  width: 26px;
+  height: 26px;
+}
+.ob__skip {
+  border: none;
+  background: none;
+  color: #264254;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  padding: 6px 2px;
+}
+
+/* ---- Header block: badge + title + subtitle ---- */
+.ob__head {
+  flex: 0 0 auto;
+  padding-top: 16px;
+}
+.ob__badge {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #E3F2FF;
+  color: #264254;
+  margin-bottom: 30px;
+}
+.ob__badge svg {
+  width: 30px;
+  height: 30px;
+}
+.ob__title {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: #0a0a0a;
+}
+.ob__title em {
+  font-style: italic;
+  font-weight: 700;
+}
+.ob__sub {
+  margin: 18px 0 0;
+  max-width: 21em;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  color: #111;
+}
+
+/* ---- Footer / CTA ---- */
+.ob__footer {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: 20px;
+}
+.ob__footer--floating {
+  /* Brands list scrolls behind; the CTA floats over the bottom. */
+  position: sticky;
+  bottom: 0;
+}
+.ob__cta {
+  width: 100%;
+  height: 64px;
+  border: none;
+  border-radius: 999px;
+  background: #264254;
+  color: #fff;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.2s ease, background 0.2s ease;
+}
+.ob__cta:active {
+  transform: scale(0.985);
+}
+.ob__cta:disabled {
+  opacity: 0.85;
+  cursor: default;
+}
+
+/* ============================================================= */
+/* Screen 1 — Wear cards                                           */
+/* ============================================================= */
+.ob__cards {
+  flex: 0 0 auto;
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+.ob__card {
+  position: relative;
+  height: 256px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px;
+  border: none;
+  background: #E3F2FF;
+  color: #0a0a0a;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.ob__cards > .ob__card:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.ob__cards > .ob__card:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.ob__card--on {
+  background: #D0E8FF;
+}
+.ob__radio {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid #A8CCE8;
+  background: transparent;
+  color: #fff;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.ob__radio--on {
+  background: #264254;
+  border-color: #264254;
+}
+.ob__radio svg {
+  width: 18px;
+  height: 18px;
+}
+.ob__card-label {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================= */
+/* Screen 2 — Body shape (2×2 grid of the same card surface)      */
+/* ============================================================= */
+/* This screen can grow past the viewport — let it scroll. */
+.ob__screen--shape {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.ob__screen--shape::-webkit-scrollbar {
+  display: none;
+}
+.ob__screen--shape .ob__title {
+  font-size: 34px;
+}
+.ob__screen--shape .ob__sub {
+  margin-top: 12px;
+  font-size: 16px;
+}
+.ob__cards--shape {
+  flex: 0 0 auto;
+  margin-top: 20px;
+  margin-bottom: 4px;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 300px;
+  gap: 2px;
+}
+.ob__card--shape {
+  height: auto;
+  min-height: 0;
+  padding: 14px 16px;
+}
+/* Keep the CTA reachable while the cards scroll behind it. */
+.ob__screen--shape .ob__footer {
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
+  padding-bottom: 4px;
+  background: linear-gradient(to top, #fff 70%, rgba(255, 255, 255, 0));
+}
+/* Four corners instead of the wear screen's two. */
+.ob__cards--shape > .ob__card:nth-child(1) {
+  border-radius: 4px 0 0 0;
+}
+.ob__cards--shape > .ob__card:nth-child(2) {
+  border-radius: 0 4px 0 0;
+}
+.ob__cards--shape > .ob__card:nth-child(3) {
+  border-radius: 0 0 0 4px;
+}
+.ob__cards--shape > .ob__card:nth-child(4) {
+  border-radius: 0 0 4px 0;
+}
+.ob__shape-img {
+  flex: 1 1 0;
+  min-height: 0;
+  align-self: stretch;
+  width: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+}
+.ob__card--shape .ob__card-label {
+  flex: 0 0 auto;
+  width: 100%;
+  text-align: center;
+  font-size: 17px;
+}
+
+/* ============================================================= */
+/* Screen 3 — Occupation                                          */
+/* ============================================================= */
+.ob__field-wrap {
+  flex: 0 0 auto;
+  margin-top: 36px;
+}
+.ob__field {
+  width: 100%;
+  height: 64px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 12px;
+  background: #E3F2FF;
+  color: #0a0a0a;
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ob__field::placeholder {
+  color: #b3b3b3;
+  font-weight: 500;
+}
+
+.ob__chips {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 14px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: 8px;
+}
+.ob__chips::-webkit-scrollbar {
+  display: none;
+}
+.ob__chip {
+  flex: 0 0 auto;
+  padding: 16px 26px;
+  border: none;
+  border-radius: 999px;
+  background: #E3F2FF;
+  color: #0a0a0a;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+.ob__chip:active {
+  transform: scale(0.97);
+}
+.ob__chip--on {
+  background: #264254;
+  color: #fff;
+}
+
+/* ============================================================= */
+/* Screen 4 — Brands                                              */
+/* ============================================================= */
+.ob__brands {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ob__search {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+.ob__search-input {
+  width: 100%;
+  height: 70px;
+  padding: 0 56px 0 24px;
+  border: none;
+  border-radius: 4px;
+  background: #E3F2FF;
+  color: #0a0a0a;
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ob__search-input::placeholder {
+  color: #b3b3b3;
+  font-weight: 500;
+}
+.ob__search-icon {
+  position: absolute;
+  right: 22px;
+  display: grid;
+  place-items: center;
+  color: #264254;
+  pointer-events: none;
+}
+.ob__search-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.ob__brand-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* Let the floating CTA overlap the tail of the list, like the mockup. */
+  padding-bottom: 96px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent 100%);
+}
+.ob__brand-list::-webkit-scrollbar {
+  display: none;
+}
+.ob__brand-row {
+  flex: 0 0 auto;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 0 24px;
+  background: #E3F2FF;
+  transition: background 0.18s ease;
+}
+.ob__brand-name {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0a0a0a;
+}
+.ob__heart {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: #264254;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+.ob__heart:active {
+  transform: scale(0.9);
+}
+.ob__heart svg {
+  width: 24px;
+  height: 24px;
+}
+.ob__heart--on {
+  background: #264254;
+  color: #fff;
+}
+
+/* The floating CTA needs an opaque base so list rows don't show through. */
+.ob__footer--floating {
+  background: linear-gradient(to top, #fff 62%, rgba(255, 255, 255, 0));
+  margin-top: -64px;
+  padding-bottom: 4px;
+}

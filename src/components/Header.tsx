@@ -53,9 +53,14 @@ function HandbagIcon() {
 
 interface HeaderProps {
   onBack?: () => void;
+  bagCount?: number;
+  bagPulseKey?: number;
 }
 
-export function Header({ onBack }: HeaderProps) {
+export function Header({ onBack, bagCount = 0, bagPulseKey = 0 }: HeaderProps) {
+  const hasBagItems = bagCount > 0;
+  const bagLabel = hasBagItems ? `Bag, ${bagCount} ${bagCount === 1 ? 'item' : 'items'}` : 'Bag';
+
   return (
     <header className="app__header">
       <div className="header__brand">
@@ -69,8 +74,14 @@ export function Header({ onBack }: HeaderProps) {
         <button className="header__button" type="button" aria-label="Favorites">
           <HeartIcon />
         </button>
-        <button className="header__button" type="button" aria-label="Bag">
+        <button
+          key={bagPulseKey}
+          className={`header__button header__button--bag${bagPulseKey ? ' header__button--bag-bump' : ''}`}
+          type="button"
+          aria-label={bagLabel}
+        >
           <HandbagIcon />
+          {hasBagItems && <span className="header__bag-badge">{bagCount > 99 ? '99+' : bagCount}</span>}
         </button>
       </div>
     </header>

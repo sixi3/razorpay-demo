@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { animated, useSpring } from '@react-spring/web';
 import { useDrag } from '@use-gesture/react';
 import {
@@ -14,6 +14,7 @@ import type { TileRect } from '../grid/useInfiniteGrid';
 import { Header } from './Header';
 import { PdpMainPiece, PdpProduct } from './PdpBlock';
 import { QueryFab } from './QueryFab';
+import { CoreSpokesLoader } from './CoreSpokesLoader';
 
 // Carousel geometry: the active slide is centred and the neighbours peek in.
 // The model PNGs are very tall/narrow (~0.32 aspect) with wide transparent side
@@ -64,10 +65,20 @@ type StylistRunsByItem = Record<number, StylistRun[]>;
 interface DetailViewProps {
   startItem: Item;
   originRect: TileRect;
+  bagCount: number;
+  bagPulseKey: number;
+  onAddToBag: (quantity?: number) => void;
   onClose: () => void;
 }
 
-export function DetailView({ startItem, originRect, onClose }: DetailViewProps) {
+export function DetailView({
+  startItem,
+  originRect,
+  bagCount,
+  bagPulseKey,
+  onAddToBag,
+  onClose,
+}: DetailViewProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLImageElement>(null); // active slide image — FLIP target
   const scrollRef = useRef<HTMLDivElement>(null); // drawer content scroller
@@ -92,6 +103,7 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
   // so the enter slide-up doesn't momentarily blow the model up to full height.
   const [coupled, setCoupled] = useState(false);
   const [drawerScrolled, setDrawerScrolled] = useState(false); // top fade-mask toggle
+  const [drawerAtBottom, setDrawerAtBottom] = useState(false); // expands the stylist FAB near the end
   const [swiping, setSwiping] = useState(false); // brief blur when a snapped item commits
   const [stylistRunsByItem, setStylistRunsByItem] = useState<StylistRunsByItem>({});
   const carouselIntent = useRef(false);
@@ -302,10 +314,29 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
     armSettleMonitor(); // momentum may continue past lift-off; detect its end
   };
 
-  const onDrawerScroll = () => {
+  const updateDrawerScrollState = useCallback(() => {
     const sc = scrollRef.current;
-    if (sc) setDrawerScrolled(sc.scrollTop > 4);
+    if (!sc) return;
+    const scrollable = sc.scrollHeight > sc.clientHeight + 2;
+    const distanceFromBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
+    setDrawerScrolled(sc.scrollTop > 4);
+    setDrawerAtBottom(scrollable && distanceFromBottom <= 8);
+  }, []);
+
+  const onDrawerScroll = () => {
+    updateDrawerScrollState();
   };
+
+  useLayoutEffect(() => {
+    updateDrawerScrollState();
+  }, [
+    activeItem.id,
+    piece.id,
+    selectedSimilar?.id,
+    activeStylistRuns.length,
+    latestActiveStylistRun?.streamedText.length,
+    updateDrawerScrollState,
+  ]);
 
   // Move the sheet to one of three detents: expanded (full), collapsed (rest),
   // or peek (header + description only, model enlarged behind it).
@@ -525,8 +556,8 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
           <p className="drawer__desc">{outfit.description}</p>
 
           <div className="drawer__cta-wrap">
-            <button className="drawer__cta" type="button">
-              Add {outfit.pieces.length} items to cart · {formatPrice(outfit.total)}
+            <button className="drawer__cta" type="button" onClick={() => onAddToBag(outfit.pieces.length)}>
+              Add {outfit.pieces.length} items to bag · {formatPrice(outfit.total)}
             </button>
           </div>
 
@@ -551,7 +582,7 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
             ))}
           </div>
 
-          <PdpMainPiece product={piece} size={size} onSizeChange={setSize} />
+          <PdpMainPiece product={piece} size={size} onSizeChange={setSize} onAddToBag={onAddToBag} />
 
           <p className="drawer__similar-label">Similar Products</p>
           <div className="drawer__similar">
@@ -570,7 +601,7 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
             ))}
           </div>
 
-          {selectedSimilar && <PdpProduct product={selectedSimilar} />}
+          {selectedSimilar && <PdpProduct product={selectedSimilar} onAddToBag={onAddToBag} />}
 
           {activeStylistRuns.map((stylistRun) => (
 	            <section className="stylist-thread" aria-label="Stylist response" key={stylistRun.id}>
@@ -590,7 +621,11 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
 
 	              {stylistRun.status === 'loading' ? (
 	                <div className="stylist-thread__agent">
-	                  <span className="stylist-thread__loader" aria-hidden="true" />
+	                  <CoreSpokesLoader
+	                    compact
+	                    showText={false}
+	                    label={STYLIST_LOADING_STEPS[stylistRun.loadingStep]}
+	                  />
 	                  <span>{STYLIST_LOADING_STEPS[stylistRun.loadingStep]}</span>
 	                </div>
 	              ) : (
@@ -625,7 +660,7 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
                             ))}
                           </div>
 
-                          <PdpProduct product={selectedProduct} />
+                          <PdpProduct product={selectedProduct} onAddToBag={onAddToBag} />
 
                           <div className="stylist-thread__related">
                             <p className="drawer__similar-label">Similar Products</p>
@@ -653,8 +688,8 @@ export function DetailView({ startItem, originRect, onClose }: DetailViewProps) 
 	      </animated.div>
 
       {/* ---- Chrome: screen-anchored FAB, header + flying hero ---- */}
-      <QueryFab onSubmit={submitStylistQuery} />
-      <Header onBack={close} />
+      <QueryFab autoExpanded={drawerAtBottom} onSubmit={submitStylistQuery} />
+      <Header onBack={close} bagCount={bagCount} bagPulseKey={bagPulseKey} />
 
       {flying && (
         <animated.img

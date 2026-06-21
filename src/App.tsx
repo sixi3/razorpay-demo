@@ -1,9 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Grid } from './components/Grid';
 import { Header } from './components/Header';
 import { OutfitStrip } from './components/OutfitStrip';
 import { QueryInput } from './components/QueryInput';
 import { DetailView } from './components/DetailView';
+import { Onboarding } from './components/Onboarding';
+import { Walkthrough } from './components/Walkthrough';
+import { CoreSpokesLoader } from './components/CoreSpokesLoader';
 import { formatPrice, items, outfitFor, type Item } from './data/items';
 import { useInfiniteGrid, type TileRect } from './grid/useInfiniteGrid';
 import './App.css';
@@ -13,18 +16,76 @@ interface Selection {
   rect: TileRect;
 }
 
+type AppPhase = 'onboarding' | 'loading' | 'grid';
+
 function App() {
+  const params = new URLSearchParams(window.location.search);
+  const startsWithOnboarding = params.get('onboarding') === 'true';
+  const startsWithWalkthrough = params.get('walkthrough') === 'true';
+  const [phase, setPhase] = useState<AppPhase>(startsWithOnboarding ? 'onboarding' : 'loading');
+  const [showWalkthroughOnGrid, setShowWalkthroughOnGrid] = useState(
+    startsWithOnboarding || startsWithWalkthrough,
+  );
+
+  useEffect(() => {
+    if (phase !== 'loading') return undefined;
+
+    const timer = window.setTimeout(() => setPhase('grid'), 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  if (phase === 'onboarding') {
+    return (
+      <Onboarding
+        onDone={() => {
+          setShowWalkthroughOnGrid(true);
+          setPhase('loading');
+        }}
+      />
+    );
+  }
+
+  if (phase === 'loading') {
+    return (
+      <div className="app app--loading">
+        <CoreSpokesLoader />
+      </div>
+    );
+  }
+
+  return <GridExperience showWalkthroughOnMount={showWalkthroughOnGrid} />;
+}
+
+interface GridExperienceProps {
+  showWalkthroughOnMount: boolean;
+}
+
+function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
+  const [showWalkthrough, setShowWalkthrough] = useState(showWalkthroughOnMount);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [bagCount, setBagCount] = useState(0);
+  const [bagPulseKey, setBagPulseKey] = useState(0);
   const handleSelect = useCallback((item: Item, rect: TileRect) => {
     setSelection({ item, rect });
   }, []);
+  const handleAddToBag = useCallback((quantity = 1) => {
+    setBagCount((count) => count + quantity);
+    setBagPulseKey((key) => key + 1);
+  }, []);
 
-  const { bind, panRef, markerRef, chromeRef, cells, centeredItem } = useInfiniteGrid(handleSelect);
+  const { bind, panRef, markerRef, chromeRef, cells, centeredItem } =
+    useInfiniteGrid(handleSelect);
   const outfitTotal = outfitFor(centeredItem).total;
 
-  // TEMP(verify): drive the detail view without the touch gesture.
-  (window as unknown as { __openDetail: () => void }).__openDetail = () =>
-    handleSelect(items[20], { left: 120, top: 250, width: 130, height: 182 });
+  useEffect(() => {
+    const win = window as unknown as { __openDetail?: () => void };
+    // TEMP(verify): drive the detail view without the touch gesture.
+    win.__openDetail = () => handleSelect(items[20], { left: 120, top: 250, width: 130, height: 182 });
+    return () => {
+      delete win.__openDetail;
+    };
+  }, [handleSelect]);
 
   return (
     <div className="app" ref={chromeRef}>
@@ -33,7 +94,7 @@ function App() {
         <span className="app__center-marker-price">{formatPrice(outfitTotal)}</span>
       </div>
       <div className="header-backdrop" aria-hidden="true" />
-      <Header />
+      <Header bagCount={bagCount} bagPulseKey={bagPulseKey} />
       <div className="dock-backdrop" aria-hidden="true" />
       <div className="app__dock">
         <OutfitStrip item={centeredItem} />
@@ -44,9 +105,14 @@ function App() {
         <DetailView
           startItem={selection.item}
           originRect={selection.rect}
+          bagCount={bagCount}
+          bagPulseKey={bagPulseKey}
+          onAddToBag={handleAddToBag}
           onClose={() => setSelection(null)}
         />
       )}
+
+      {showWalkthrough && <Walkthrough onDone={() => setShowWalkthrough(false)} />}
     </div>
   );
 }
