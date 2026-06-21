@@ -70,7 +70,7 @@ export function PdpMainPiece({
     <>
       <div className="pdp">
         <div className="pdp__media">
-          <img src={product.imageUrl} alt={product.name} draggable={false} />
+          <img src={product.imageUrl} alt={product.name} draggable={false} decoding="async" loading="lazy" />
         </div>
         <div className="pdp__info">
           <PdpDetails product={product} />
@@ -102,7 +102,7 @@ export function PdpProduct({ product, onAddToBag }: { product: PdpProductLike; o
     <>
       <div className="pdp">
         <div className="pdp__media">
-          <img src={product.imageUrl} alt={product.name} draggable={false} />
+          <img src={product.imageUrl} alt={product.name} draggable={false} decoding="async" loading="lazy" />
         </div>
         <div className="pdp__info">
           <PdpDetails product={product} />

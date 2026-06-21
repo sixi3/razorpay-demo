@@ -24,7 +24,15 @@ const Tile = memo(function Tile({ x, y, src, alt, isCenter }: TileProps) {
       className={`tile${isCenter ? ' tile--center' : ''}`}
       style={{ transform: `translate3d(${x}px, ${y}px, 0)`, width: TILE_W, height: TILE_H }}
     >
-      <img className="tile__img" src={src} alt={alt} draggable={false} decoding="async" />
+      <img
+        className="tile__img"
+        src={src}
+        alt={alt}
+        draggable={false}
+        decoding="async"
+        loading={isCenter ? 'eager' : 'lazy'}
+        fetchPriority={isCenter ? 'high' : 'auto'}
+      />
     </div>
   );
 });
@@ -38,7 +46,7 @@ export function Grid({ bind, panRef, cells }: GridProps) {
             key={cell.key}
             x={cell.x}
             y={cell.y}
-            src={cell.item.imageUrl}
+            src={cell.item.gridImageUrl}
             alt={cell.item.occasion}
             isCenter={cell.isCenter}
           />

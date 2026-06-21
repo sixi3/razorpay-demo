@@ -32,9 +32,21 @@ function App() {
   useEffect(() => {
     if (phase !== 'loading') return undefined;
 
+    const preloadImages = Array.from(new Set(items.map((item) => item.gridImageUrl))).map((src) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = src;
+      return img;
+    });
     const timer = window.setTimeout(() => setPhase('grid'), 5000);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      preloadImages.forEach((img) => {
+        img.onload = null;
+        img.onerror = null;
+      });
+      window.clearTimeout(timer);
+    };
   }, [phase]);
 
   if (phase === 'onboarding') {

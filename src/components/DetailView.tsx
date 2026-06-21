@@ -533,6 +533,8 @@ export function DetailView({
                 alt={it.occasion}
                 draggable={false}
                 decoding="async"
+                loading={Math.abs(rawIndex - activeRawIndex) <= 1 ? 'eager' : 'lazy'}
+                fetchPriority={rawIndex === activeRawIndex ? 'high' : 'low'}
                 style={{ opacity: flying && rawIndex === activeRawIndex ? 0 : 1 }}
               />
             </div>
@@ -578,7 +580,14 @@ export function DetailView({
                   className={`piece-chip${p.id === piece.id ? ' piece-chip--active' : ''}`}
                   onClick={() => setPieceId(p.id)}
                 >
-                  <img className="piece-chip__img" src={p.imageUrl} alt={p.label} draggable={false} />
+                  <img
+                    className="piece-chip__img"
+                    src={p.imageUrl}
+                    alt={p.label}
+                    draggable={false}
+                    decoding="async"
+                    loading="lazy"
+                  />
                 </button>
                 <span className="piece-chip__badge">{formatPrice(p.price)}</span>
               </div>
@@ -597,7 +606,7 @@ export function DetailView({
                   aria-label={similarProductLabel(s)}
                   onClick={() => setSimilarId(s.id)}
                 >
-                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} />
+                  <img className="sim__img" src={s.imageUrl} alt={s.name} draggable={false} decoding="async" loading="lazy" />
                 </button>
                 <span className="sim__badge">{formatPrice(s.price)}</span>
               </div>
@@ -656,7 +665,14 @@ export function DetailView({
                                   aria-label={similarProductLabel(product)}
                                   onClick={() => selectStylistProduct(activeItem.id, stylistRun.id, product.id)}
                                 >
-                                  <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
+                                  <img
+                                    className="sim__img"
+                                    src={product.imageUrl}
+                                    alt={product.name}
+                                    draggable={false}
+                                    decoding="async"
+                                    loading="lazy"
+                                  />
                                 </button>
                                 <span className="sim__badge">{formatPrice(product.price)}</span>
                               </div>
@@ -671,7 +687,14 @@ export function DetailView({
                               {selectedProductSimilar.map((product) => (
                                 <div className="sim" key={product.id}>
                                   <button className="sim__chip" type="button" aria-label={similarProductLabel(product)}>
-                                    <img className="sim__img" src={product.imageUrl} alt={product.name} draggable={false} />
+                                    <img
+                                      className="sim__img"
+                                      src={product.imageUrl}
+                                      alt={product.name}
+                                      draggable={false}
+                                      decoding="async"
+                                      loading="lazy"
+                                    />
                                   </button>
                                   <span className="sim__badge">{formatPrice(product.price)}</span>
                                 </div>
@@ -700,6 +723,8 @@ export function DetailView({
           src={outfitFor(startItem).modelImage}
           alt=""
           draggable={false}
+          decoding="async"
+          fetchPriority="high"
           style={fly}
         />
       )}

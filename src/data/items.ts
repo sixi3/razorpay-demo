@@ -27,6 +27,7 @@ export type Occasion = (typeof OCCASIONS)[number];
 export interface Item {
   id: number;
   imageUrl: string;
+  gridImageUrl: string;
   occasion: Occasion;
   price: number; // INR — kept for the grid; the drawer total comes from outfitFor()
 }
@@ -76,6 +77,8 @@ export const OCCASION_META: Record<Occasion, OccasionMeta> = {
   },
 };
 
+const gridModelImage = (modelImage: string) => `/grid-models${modelImage}`;
+
 // A small curated price spread per occasion so the grid bubble feels intentional.
 const PRICE_BANDS: Record<Occasion, [number, number]> = {
   'Client Meeting': [3499, 6999],
@@ -120,6 +123,7 @@ export const items: Item[] = Array.from({ length: COUNT }, (_, i) => {
     // The tile hero is the occasion's model shot, which the detail carousel
     // flies from; cycling occasions puts all seven models across the grid.
     imageUrl: OCCASION_META[occasion].modelImage,
+    gridImageUrl: gridModelImage(OCCASION_META[occasion].modelImage),
     occasion,
     price: priceFor(occasion, i + 1),
   };
