@@ -109,12 +109,8 @@ export function DetailView({
   const [drawerAtBottom, setDrawerAtBottom] = useState(false); // expands the stylist FAB near the end
   const [swiping, setSwiping] = useState(false); // brief blur when a snapped item commits
   const [stylistRunsByItem, setStylistRunsByItem] = useState<StylistRunsByItem>({});
-  const carouselIntent = useRef(false);
-  const carouselIntentTimer = useRef<number | undefined>(undefined);
-  const carouselDragging = useRef(false); // a finger is currently down on the carousel
-  const settleRaf = useRef<number | undefined>(undefined); // settle-detection loop handle
-  const lastScrollLeft = useRef(0);
-  const stableFrames = useRef(0);
+  const carouselAnimating = useRef(false);
+  const pendingCarouselReset = useRef(false);
   const stylistTimers = useRef<number[]>([]);
   const activeRawIndexRef = useRef(activeRawIndex);
   useEffect(() => {
@@ -123,8 +119,6 @@ export function DetailView({
   useEffect(() => {
     const timers = stylistTimers.current;
     return () => {
-      if (carouselIntentTimer.current) clearTimeout(carouselIntentTimer.current);
-      if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
       timers.forEach((timer) => clearTimeout(timer));
     };
   }, []);
@@ -174,6 +168,15 @@ export function DetailView({
 
   // The bottom sheet's vertical position (its top edge). Starts off-screen.
   const [{ y }, sheetApi] = useSpring(() => ({ y: window.innerHeight }));
+  const [{ carouselX }, carouselApi] = useSpring(() => ({ carouselX: 0 }));
+
+  useLayoutEffect(() => {
+    if (!pendingCarouselReset.current) return;
+    pendingCarouselReset.current = false;
+    carouselApi.set({ carouselX: 0 });
+    carouselAnimating.current = false;
+    setSwiping(false);
+  }, [activeRawIndex, carouselApi]);
 
   // Measure carousel width + sheet detents (and keep them in sync on resize).
   useLayoutEffect(() => {
@@ -202,9 +205,6 @@ export function DetailView({
     }
     enteredOnce.current = true;
 
-    const step = trackW * SLIDE_FRAC;
-    trackRef.current.scrollLeft = activeRawIndex * step;
-
     const target = heroRef.current.getBoundingClientRect();
     flyApi.set({
       left: originRect.left,
@@ -230,93 +230,61 @@ export function DetailView({
     });
 
     requestAnimationFrame(() => setEntered(true));
-  }, [trackW, metrics, activeRawIndex, originRect, flyApi, sheetApi]);
+  }, [trackW, metrics, originRect, flyApi, sheetApi]);
 
-  // Commit the carousel to the slide it has settled on. Driven by the settle
-  // detector below (not a fixed timeout), so the read always reflects the final
-  // resting position — never an intermediate frame mid-momentum.
-  const finalizeCarouselSnap = () => {
-    const track = trackRef.current;
-    if (!track || !trackW) return;
-    if (!carouselIntent.current) return;
-    const step = trackW * SLIDE_FRAC;
-    const settledIdx = clamp(Math.round(track.scrollLeft / step), 0, itemCount * 3 - 1);
-    const normalized = mod(settledIdx, itemCount);
-    const targetIdx =
-      settledIdx < itemCount || settledIdx >= itemCount * 2
-        ? itemCount + normalized
-        : settledIdx;
-
-    // Recentre into the middle band so the carousel scrolls on forever. Within
-    // the middle band this writes the same value, so it never yanks the finger.
-    track.scrollLeft = targetIdx * step;
-
-    if (targetIdx !== activeRawIndexRef.current) {
-      activeRawIndexRef.current = targetIdx;
-      setActiveRawIndex(targetIdx);
-    }
-    setSwiping(false); // reveal the (now matching) details right away
-    carouselIntent.current = false;
+  const resetCarouselMotion = () => {
+    carouselAnimating.current = false;
+    carouselApi.start({ carouselX: 0, immediate: true });
+    setSwiping(false);
   };
 
-  // Wait for the scroll to actually stop — position stable across frames AND the
-  // finger lifted so momentum has run out — before committing. Replaces a fixed
-  // 160ms debounce that could fire while the carousel was still gliding and snap
-  // to the wrong slide.
-  const monitorSettle = () => {
-    const track = trackRef.current;
-    if (!track) {
-      settleRaf.current = undefined;
-      return;
-    }
-    const sl = track.scrollLeft;
-    if (Math.abs(sl - lastScrollLeft.current) <= 0.5) stableFrames.current += 1;
-    else stableFrames.current = 0;
-    lastScrollLeft.current = sl;
+  const bindCarousel = useDrag(
+    ({ first, last, movement: [mx], velocity: [vx], direction: [dx] }) => {
+      if (!trackW || carouselAnimating.current) return;
+      const step = trackW * SLIDE_FRAC;
+      const dragX = clamp(mx, -step, step);
+      if (first) setSwiping(false);
 
-    if (stableFrames.current >= 2 && !carouselDragging.current) {
-      settleRaf.current = undefined;
-      finalizeCarouselSnap();
-      return;
-    }
-    settleRaf.current = requestAnimationFrame(monitorSettle);
-  };
-
-  const armSettleMonitor = () => {
-    stableFrames.current = 0;
-    lastScrollLeft.current = trackRef.current?.scrollLeft ?? 0;
-    if (settleRaf.current == null) settleRaf.current = requestAnimationFrame(monitorSettle);
-  };
-
-  const onScroll = () => {
-    const track = trackRef.current;
-    if (!track || !trackW || !carouselIntent.current) return;
-    setSwiping(true);
-    armSettleMonitor();
-  };
-
-  const onCarouselIntent = () => {
-    carouselIntent.current = true;
-    if (carouselIntentTimer.current) clearTimeout(carouselIntentTimer.current);
-    carouselIntentTimer.current = window.setTimeout(() => {
-      // Pressed but never scrolled — drop the intent so a later programmatic
-      // scroll isn't mistaken for a swipe.
-      if (!carouselDragging.current) {
-        carouselIntent.current = false;
-        setSwiping(false);
+      if (!last) {
+        if (Math.abs(dragX) > 6) setSwiping(true);
+        carouselApi.start({ carouselX: dragX, immediate: true });
+        return;
       }
-    }, 900);
-  };
 
-  const onCarouselTouchStart = () => {
-    carouselDragging.current = true;
-    onCarouselIntent();
-  };
+      const flick = dx * vx;
+      const threshold = step * 0.22;
+      let delta = 0;
+      if (dragX < -threshold || flick < -0.35) delta = 1;
+      else if (dragX > threshold || flick > 0.35) delta = -1;
 
-  const onCarouselTouchEnd = () => {
-    carouselDragging.current = false;
-    armSettleMonitor(); // momentum may continue past lift-off; detect its end
-  };
+      if (delta === 0) {
+        carouselApi.start({
+          carouselX: 0,
+          config: { tension: 320, friction: 34 },
+          onRest: () => setSwiping(false),
+        });
+        return;
+      }
+
+      carouselAnimating.current = true;
+      setSwiping(true);
+      carouselApi.start({
+        carouselX: -delta * step,
+        config: { tension: 320, friction: 34 },
+        onRest: () => {
+          const next = activeRawIndexRef.current + delta;
+          pendingCarouselReset.current = true;
+          activeRawIndexRef.current = next;
+          setActiveRawIndex(next);
+        },
+      });
+    },
+    {
+      axis: 'x',
+      pointer: { touch: true },
+      filterTaps: true,
+    },
+  );
 
   const updateDrawerScrollState = useCallback(() => {
     const sc = scrollRef.current;
@@ -438,6 +406,7 @@ export function DetailView({
       const { expandedY, collapsedY, peekY } = metricsRef.current;
       let m = memo as DragMemo | undefined;
       if (first || !m) {
+        resetCarouselMotion();
         const atTop = !scrollRef.current || scrollRef.current.scrollTop <= 0;
         m = { startY: y.get(), mode: !expanded || atTop ? 'sheet' : 'scroll' };
       }
@@ -474,8 +443,7 @@ export function DetailView({
 
   const close = () => {
     if (closing) return;
-    if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
-    carouselIntent.current = false;
+    resetCarouselMotion();
     setClosing(true);
     setEntered(false);
     setCoupled(false); // freeze the carousel height while the sheet slides away
@@ -495,11 +463,16 @@ export function DetailView({
   };
 
   const slideW = trackW * SLIDE_FRAC;
-  const peekPx = trackW * PEEK;
-  const carouselItems = Array.from({ length: itemCount * 3 }, (_, rawIndex) => ({
-    rawIndex,
-    item: items[mod(rawIndex, itemCount)],
+  const carouselItems = [-1, 0, 1].map((offset) => ({
+    offset,
+    rawIndex: activeRawIndex + offset,
+    item: items[mod(activeRawIndex + offset, itemCount)],
   }));
+
+  const slideStyle = (offset: number) => ({
+    width: slideW,
+    transform: carouselX.to((x) => `translate3d(${offset * slideW + x - slideW / 2}px, 0, 0)`),
+  });
 
   return (
     <div className={`detail${entered ? ' detail--entered' : ''}${closing ? ' detail--closing' : ''}`}>
@@ -517,28 +490,26 @@ export function DetailView({
         <div
           className="stage__track"
           ref={trackRef}
-          onScroll={onScroll}
-          onPointerDown={onCarouselIntent}
-          onTouchStart={onCarouselTouchStart}
-          onTouchEnd={onCarouselTouchEnd}
-          onTouchCancel={onCarouselTouchEnd}
-          onWheel={onCarouselIntent}
-          style={trackW ? { paddingInline: peekPx } : undefined}
+          {...bindCarousel()}
         >
-          {carouselItems.map(({ item: it, rawIndex }) => (
-            <div className="stage__slide" key={rawIndex} style={trackW ? { width: slideW } : undefined}>
+          {carouselItems.map(({ item: it, rawIndex, offset }) => (
+            <animated.div
+              className="stage__slide"
+              key={`${rawIndex}:${it.id}`}
+              style={trackW ? slideStyle(offset) : undefined}
+            >
               <img
-                ref={rawIndex === activeRawIndex ? heroRef : undefined}
+                ref={offset === 0 ? heroRef : undefined}
                 className="slide__img"
                 src={outfitFor(it).modelImage}
                 alt={it.occasion}
                 draggable={false}
                 decoding="async"
-                loading={Math.abs(rawIndex - activeRawIndex) <= 1 ? 'eager' : 'lazy'}
-                fetchPriority={rawIndex === activeRawIndex ? 'high' : 'low'}
-                style={{ opacity: flying && rawIndex === activeRawIndex ? 0 : 1 }}
+                loading={offset === 0 ? 'eager' : 'lazy'}
+                fetchPriority={offset === 0 ? 'high' : 'low'}
+                style={{ opacity: flying && offset === 0 ? 0 : 1 }}
               />
-            </div>
+            </animated.div>
           ))}
         </div>
       </animated.div>

@@ -790,28 +790,22 @@
 }
 
 .stage__track {
+  position: relative;
   height: 100%;
-  display: flex;
-  align-items: stretch;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overflow-anchor: none;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   touch-action: pan-x;
-}
-.stage__track::-webkit-scrollbar {
-  display: none;
 }
 
 .stage__slide {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
   height: 100%;
-  scroll-snap-align: center;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  will-change: transform;
 }
 .slide__img {
   width: 100%;
