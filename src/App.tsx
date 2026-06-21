@@ -7,6 +7,7 @@ import { DetailView } from './components/DetailView';
 import { Onboarding } from './components/Onboarding';
 import { Walkthrough } from './components/Walkthrough';
 import { CoreSpokesLoader } from './components/CoreSpokesLoader';
+import { SearchingOverlay } from './components/SearchingOverlay';
 import { formatPrice, items, outfitFor, type Item } from './data/items';
 import { useInfiniteGrid, type TileRect } from './grid/useInfiniteGrid';
 import './App.css';
@@ -14,6 +15,7 @@ import './App.css';
 interface Selection {
   item: Item;
   rect: TileRect;
+  pieceId?: string;
 }
 
 type AppPhase = 'onboarding' | 'loading' | 'grid';
@@ -66,16 +68,45 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [bagCount, setBagCount] = useState(0);
   const [bagPulseKey, setBagPulseKey] = useState(0);
-  const handleSelect = useCallback((item: Item, rect: TileRect) => {
-    setSelection({ item, rect });
+  const [searching, setSearching] = useState(false);
+  const [shuffleSeed, setShuffleSeed] = useState(0);
+  const handleSelect = useCallback((item: Item, rect: TileRect, pieceId?: string) => {
+    setSelection({ item, rect, pieceId });
   }, []);
   const handleAddToBag = useCallback((quantity = 1) => {
     setBagCount((count) => count + quantity);
     setBagPulseKey((key) => key + 1);
   }, []);
+  const handleSearch = useCallback(() => setSearching(true), []);
+  const handleStop = useCallback(() => setSearching(false), []);
+
+  // A search shows the dot-matrix loader for 5s, then reveals a re-jumbled grid.
+  useEffect(() => {
+    if (!searching) return undefined;
+    const timer = window.setTimeout(() => {
+      setShuffleSeed((seed) => seed + 1);
+      setSearching(false);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [searching]);
 
   const { bind, panRef, markerRef, chromeRef, cells, centeredItem } =
-    useInfiniteGrid(handleSelect);
+    useInfiniteGrid(handleSelect, shuffleSeed);
+  const handlePreviewSelect = useCallback(
+    (pieceId: string, rect: DOMRect) => {
+      handleSelect(
+        centeredItem,
+        {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        pieceId,
+      );
+    },
+    [centeredItem, handleSelect],
+  );
   const outfitTotal = outfitFor(centeredItem).total;
 
   useEffect(() => {
@@ -88,8 +119,10 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
   }, [handleSelect]);
 
   return (
-    <div className="app" ref={chromeRef}>
+    <div className={`app${searching ? ' app--searching' : ''}`} ref={chromeRef}>
       <Grid bind={bind as never} panRef={panRef} cells={cells} />
+      {/* Swaps in over the grid only — header + dock stay layered above it. */}
+      {searching && <SearchingOverlay />}
       <div className="app__center-marker" ref={markerRef} aria-hidden="true">
         <span className="app__center-marker-price">{formatPrice(outfitTotal)}</span>
       </div>
@@ -97,13 +130,16 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
       <Header bagCount={bagCount} bagPulseKey={bagPulseKey} />
       <div className="dock-backdrop" aria-hidden="true" />
       <div className="app__dock">
-        <OutfitStrip item={centeredItem} />
-        <QueryInput />
+        {/* The Includes preview mirrors the centered grid item, so it hides with
+            the grid; the query bar stays bottom-anchored and in place. */}
+        {!searching && <OutfitStrip item={centeredItem} onSelectPiece={handlePreviewSelect} />}
+        <QueryInput onSearch={handleSearch} loading={searching} onStop={handleStop} />
       </div>
 
       {selection && (
         <DetailView
           startItem={selection.item}
+          initialPieceId={selection.pieceId}
           originRect={selection.rect}
           bagCount={bagCount}
           bagPulseKey={bagPulseKey}

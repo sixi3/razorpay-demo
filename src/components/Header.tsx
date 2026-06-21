@@ -68,7 +68,7 @@ export function Header({ onBack, bagCount = 0, bagPulseKey = 0 }: HeaderProps) {
           <CaretLeftIcon />
           <img className="header__back-logo" src="/ajio-icon.png" alt="" draggable={false} />
         </button>
-        <div className="header__title">Asta</div>
+        <div className="header__title">Nova</div>
       </div>
       <div className="header__actions">
         <button className="header__button" type="button" aria-label="Favorites">

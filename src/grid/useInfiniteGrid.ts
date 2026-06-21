@@ -1,6 +1,6 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useGesture } from '@use-gesture/react';
-import { items, type Item } from '../data/items';
+import { OCCASIONS, items, type Item, type Occasion } from '../data/items';
 
 // Tile geometry (px). Portrait 3:4 to match full-body model framing.
 export const CELL_W = 168; // includes horizontal gutter
@@ -11,6 +11,7 @@ export const TILE_H = 208;
 // Horizontal period of the wrap pattern. Moving one column steps one item,
 // moving one row jumps by COLS — gives variety in both axes.
 const COLS = 7;
+const SAFE_COLUMN_STEP = 2;
 
 // Inertia: time-based decay so 60Hz and 120Hz screens travel similarly.
 const INERTIA_DECAY_MS = 260;
@@ -35,8 +36,50 @@ const TAP_SLOP = 6;
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-const itemAt = (col: number, row: number): Item =>
-  items[mod(row * COLS + col, items.length)];
+
+const shuffleWithSeed = <T,>(values: readonly T[], seed: number): T[] => {
+  const arr = values.slice();
+  let s = (seed * 2654435761) >>> 0;
+  const rand = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
+// Seeded reshuffle for a "new search" that keeps the no-touching outfit layout:
+// we shuffle which occasion owns each safe slot, but never shuffle individual
+// tiles freely. seed 0 keeps the original order; same seed -> same arrangement.
+const orderItems = (seed: number): Item[] => {
+  if (seed <= 0) return items;
+
+  const occasionOrder = shuffleWithSeed(OCCASIONS, seed);
+  const buckets = new Map<Occasion, Item[]>();
+  for (const occasion of OCCASIONS) {
+    buckets.set(
+      occasion,
+      shuffleWithSeed(
+        items.filter((item) => item.occasion === occasion),
+        seed + occasion.length,
+      ),
+    );
+  }
+
+  const nextByOccasion = new Map<Occasion, number>();
+  return Array.from({ length: items.length }, (_, i) => {
+    const row = Math.floor(i / COLS);
+    const col = i % COLS;
+    const occasion = occasionOrder[mod(row + col * SAFE_COLUMN_STEP, occasionOrder.length)];
+    const bucket = buckets.get(occasion) ?? items;
+    const next = nextByOccasion.get(occasion) ?? 0;
+    nextByOccasion.set(occasion, next + 1);
+    return bucket[next % bucket.length];
+  });
+};
 
 export interface Cell {
   key: string;
@@ -57,10 +100,20 @@ export interface TileRect {
   height: number;
 }
 
-export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void) {
+export function useInfiniteGrid(
+  onSelect?: (item: Item, rect: TileRect) => void,
+  shuffleSeed = 0,
+) {
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [center, setCenter] = useState({ col: 0, row: 0 });
   const centerRef = useRef(center);
+
+  // Current tile ordering — reshuffled whenever shuffleSeed changes (a search).
+  const orderedItems = useMemo(() => orderItems(shuffleSeed), [shuffleSeed]);
+  const itemAt = useCallback(
+    (col: number, row: number): Item => orderedItems[mod(row * COLS + col, orderedItems.length)],
+    [orderedItems],
+  );
 
   const panRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<HTMLDivElement>(null);
@@ -200,35 +253,34 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
   // Autonomous "discover" drift for the onboarding walkthrough: gently orbits
   // the grid so tiles glide past on their own, previewing what a pan does. No
   // snap or haptics while it runs; settles onto the nearest item when stopped.
-  // Wrapped in a stable ref object so consumers can hold a constant identity
-  // while the closures pick up the latest transform each render.
-  const demoDriftRef = useRef<{ start: () => void; stop: () => void }>({ start() {}, stop() {} });
-  demoDriftRef.current.start = () => {
-    if (driftActive.current) return;
-    driftActive.current = true;
-    stopInertia();
-    stopSnap();
-    const baseX = tf.current.x;
-    const baseY = tf.current.y;
-    const t0 = performance.now();
-    const loop = (now: number) => {
-      const t = (now - t0) / 1000;
-      tf.current.x = baseX + Math.sin(t * 0.55) * CELL_W * 0.92;
-      tf.current.y = baseY + Math.sin(t * 0.43 + 1.1) * CELL_H * 0.6;
-      apply();
+  const [demoDrift] = useState(() => ({
+    start: () => {
+      if (driftActive.current) return;
+      driftActive.current = true;
+      stopInertia();
+      stopSnap();
+      const baseX = tf.current.x;
+      const baseY = tf.current.y;
+      const t0 = performance.now();
+      const loop = (now: number) => {
+        const t = (now - t0) / 1000;
+        tf.current.x = baseX + Math.sin(t * 0.55) * CELL_W * 0.92;
+        tf.current.y = baseY + Math.sin(t * 0.43 + 1.1) * CELL_H * 0.6;
+        apply();
+        driftRaf.current = requestAnimationFrame(loop);
+      };
       driftRaf.current = requestAnimationFrame(loop);
-    };
-    driftRaf.current = requestAnimationFrame(loop);
-  };
-  demoDriftRef.current.stop = () => {
-    if (!driftActive.current) return;
-    driftActive.current = false;
-    if (driftRaf.current != null) {
-      cancelAnimationFrame(driftRaf.current);
-      driftRaf.current = null;
-    }
-    scheduleSnap();
-  };
+    },
+    stop: () => {
+      if (!driftActive.current) return;
+      driftActive.current = false;
+      if (driftRaf.current != null) {
+        cancelAnimationFrame(driftRaf.current);
+        driftRaf.current = null;
+      }
+      scheduleSnap();
+    },
+  }));
 
   // Initialise: measure viewport and centre cell (0,0) before first paint.
   useLayoutEffect(() => {
@@ -407,6 +459,6 @@ export function useInfiniteGrid(onSelect?: (item: Item, rect: TileRect) => void)
     cells,
     centeredItem,
     ready: viewport.w > 0,
-    demoDrift: demoDriftRef.current,
+    demoDrift,
   };
 }

@@ -91,39 +91,74 @@ function HeartIcon({ filled }: { filled: boolean }) {
 
 /* ---- Data ---- */
 const OCCUPATIONS = [
-  'Lawyer',
-  'Marketing lead',
-  'Software Engineer',
+  'Accountant',
+  'Architect',
+  'Artist',
+  'Banker',
+  'Business Owner',
   'College Student',
-  'High School Student',
-  'Teacher',
   'Consultant',
+  'Content Creator',
+  'Data Analyst',
+  'Doctor',
+  'Entrepreneur',
+  'Finance Manager',
+  'Founder',
+  'Graphic Designer',
+  'High School Student',
+  'Human Resources',
+  'Software Engineer',
+  'Lawyer',
+  'Marketing Lead',
+  'Media Professional',
   'Nurse',
-  'Product designer',
+  'Photographer',
+  'Product Designer',
+  'Product Manager',
+  'Sales Manager',
+  'Teacher',
+  'UX Researcher',
 ];
 
 const BRANDS = [
-  'Fabindia',
-  'Andamen',
-  'Bombay Shirt Company',
-  'The Souled Store',
-  'Bewakoof',
-  'Snitch',
-  'John Jacobs',
+  'Adidas',
   'Allen Solly',
-  'Van Heusen',
-  'Peter England',
-  'Raymond',
-  'Rare Rabbit',
-  'Linen Club',
-  'Woodland',
+  'Andamen',
   'Bata',
-  'Hidesign',
+  'Bewakoof',
+  'Bombay Shirt Company',
+  'Clarks',
   'Da Milano',
-  'Westside',
+  'Fabindia',
   'Fastrack',
+  'H&M',
+  'Hidesign',
+  'HRX',
+  'John Jacobs',
+  "Levi's",
+  'Linen Club',
+  'Louis Philippe',
   'Manyavar',
+  'Metro',
+  'Nike',
+  'Peter England',
+  'Puma',
+  'Rare Rabbit',
+  'Raymond',
+  'Red Tape',
+  'Ruosh',
+  'Snitch',
+  'The Souled Store',
+  'Titan',
+  'U.S. Polo Assn.',
+  'Urban Monkey',
+  'Van Heusen',
+  'Westside',
+  'Woodland',
 ];
+
+const normalizeLabel = (value: string) => value.trim().replace(/\s+/g, ' ');
+const labelKey = (value: string) => normalizeLabel(value).toLowerCase();
 
 type Wear = 'womenswear' | 'menswear';
 
@@ -185,14 +220,17 @@ export function Onboarding({ onDone }: OnboardingProps) {
   // Drive the cross-fade whenever the target step changes.
   useEffect(() => {
     if (step === render) return;
-    setShown(false); // blur + fade the current screen out
+    const hide = requestAnimationFrame(() => setShown(false)); // blur + fade the current screen out
     const t = setTimeout(() => {
       setRender(step); // swap content while hidden
       requestAnimationFrame(() =>
         requestAnimationFrame(() => setShown(true)), // fade the new screen in
       );
     }, TRANSITION_MS);
-    return () => clearTimeout(t);
+    return () => {
+      cancelAnimationFrame(hide);
+      clearTimeout(t);
+    };
   }, [step, render]);
 
   const goNext = () =>
@@ -231,16 +269,19 @@ export function Onboarding({ onDone }: OnboardingProps) {
   };
 
   const toggleBrand = (name: string) => {
+    const label = normalizeLabel(name);
+    if (!label) return;
     setBrands((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      const existing = Array.from(next).find((brand) => labelKey(brand) === labelKey(label));
+      if (existing) next.delete(existing);
+      else next.add(label);
       return next;
     });
   };
 
-  const filteredBrands = brandQuery.trim()
-    ? BRANDS.filter((b) => b.toLowerCase().includes(brandQuery.trim().toLowerCase()))
+  const filteredBrands = normalizeLabel(brandQuery)
+    ? BRANDS.filter((b) => labelKey(b).includes(labelKey(brandQuery)))
     : BRANDS;
 
   return (
@@ -268,7 +309,6 @@ export function Onboarding({ onDone }: OnboardingProps) {
             value={occupation}
             onChange={setOccupation}
             onPick={pickOccupation}
-            onSubmit={goNext}
             onBack={goBack}
             onSkip={goNext}
           />
@@ -406,28 +446,30 @@ function BodyShapeScreen({
         <p className="ob__sub">Just so we can suggest fits that sit well — pick whatever feels closest</p>
       </div>
 
-      <div className="ob__cards ob__cards--shape">
-        {options.map((opt) => {
-          const isOn = selected === opt.id;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              className={`ob__card ob__card--shape${isOn ? ' ob__card--on' : ''}`}
-              onClick={() => onPick(opt.id)}
-              aria-pressed={isOn}
-            >
-              <span className={`ob__radio${isOn ? ' ob__radio--on' : ''}`}>
-                {isOn && <CheckIcon />}
-              </span>
-              <img className="ob__shape-img" src={opt.img} alt="" aria-hidden="true" />
-              <span className="ob__card-label">{opt.label}</span>
-            </button>
-          );
-        })}
+      <div className="ob__shape">
+        <div className="ob__cards ob__cards--shape">
+          {options.map((opt) => {
+            const isOn = selected === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`ob__card ob__card--shape${isOn ? ' ob__card--on' : ''}`}
+                onClick={() => onPick(opt.id)}
+                aria-pressed={isOn}
+              >
+                <span className={`ob__radio${isOn ? ' ob__radio--on' : ''}`}>
+                  {isOn && <CheckIcon />}
+                </span>
+                <img className="ob__shape-img" src={opt.img} alt="" aria-hidden="true" />
+                <span className="ob__card-label">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="ob__footer">
+      <div className="ob__footer ob__footer--floating">
         <button
           type="button"
           className="ob__cta"
@@ -446,17 +488,25 @@ function OccupationScreen({
   value,
   onChange,
   onPick,
-  onSubmit,
   onBack,
   onSkip,
 }: {
   value: string;
   onChange: (v: string) => void;
   onPick: (v: string) => void;
-  onSubmit: () => void;
   onBack: () => void;
   onSkip: () => void;
 }) {
+  const query = normalizeLabel(value);
+  const queryKey = labelKey(query);
+  const visibleOccupations = query
+    ? OCCUPATIONS.filter((label) => labelKey(label).includes(queryKey))
+    : OCCUPATIONS;
+  const exactMatch = query
+    ? OCCUPATIONS.some((label) => labelKey(label) === queryKey)
+    : false;
+  const occupationOptions = query && !exactMatch ? [query, ...visibleOccupations] : visibleOccupations;
+
   return (
     <div className="ob__screen">
       <TopBar onBack={onBack} onSkip={onSkip} />
@@ -474,7 +524,7 @@ function OccupationScreen({
         className="ob__field-wrap"
         onSubmit={(e) => {
           e.preventDefault();
-          if (value.trim()) onSubmit();
+          if (query) onPick(query);
         }}
       >
         <input
@@ -482,23 +532,26 @@ function OccupationScreen({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Type or selection occupation"
+          placeholder="Search or add occupation"
           enterKeyHint="done"
           aria-label="Occupation"
         />
       </form>
 
       <div className="ob__chips">
-        {OCCUPATIONS.map((label) => (
+        {occupationOptions.map((label) => (
           <button
             key={label}
             type="button"
-            className={`ob__chip${value === label ? ' ob__chip--on' : ''}`}
+            className={`ob__chip${labelKey(value) === labelKey(label) ? ' ob__chip--on' : ''}`}
             onClick={() => onPick(label)}
           >
             {label}
           </button>
         ))}
+        {occupationOptions.length === 0 && (
+          <p className="ob__empty">No matching jobs yet. Type your role to add it.</p>
+        )}
       </div>
     </div>
   );
@@ -526,6 +579,24 @@ function BrandsScreen({
 }) {
   const count = selected.size;
   const ready = count >= 3;
+  const customBrand = normalizeLabel(query);
+  const customBrandKey = labelKey(customBrand);
+  const hasCatalogMatch = customBrand
+    ? BRANDS.some((brand) => labelKey(brand) === customBrandKey)
+    : false;
+  const hasSelectedCustom = customBrand
+    ? Array.from(selected).some((brand) => labelKey(brand) === customBrandKey)
+    : false;
+  const selectedCustomBrands = Array.from(selected).filter(
+    (brand) => !BRANDS.some((preset) => labelKey(preset) === labelKey(brand)),
+  );
+  const showCustomBrand = Boolean(customBrand && !hasCatalogMatch);
+  const toggleCustomBrand = () => {
+    if (!customBrand) return;
+    onToggle(customBrand);
+    onQuery('');
+  };
+
   return (
     <div className="ob__screen">
       <TopBar onBack={onBack} onSkip={onSkip} />
@@ -540,7 +611,13 @@ function BrandsScreen({
       </div>
 
       <div className="ob__brands">
-        <div className="ob__search">
+        <form
+          className="ob__search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (showCustomBrand) toggleCustomBrand();
+          }}
+        >
           <input
             className="ob__search-input"
             type="text"
@@ -552,11 +629,42 @@ function BrandsScreen({
           <span className="ob__search-icon">
             <SearchIcon />
           </span>
-        </div>
+        </form>
 
         <div className="ob__brand-list">
+          {!customBrand &&
+            selectedCustomBrands.map((name) => (
+              <div key={name} className="ob__brand-row ob__brand-row--custom ob__brand-row--on">
+                <span className="ob__brand-name">{name}</span>
+                <button
+                  type="button"
+                  className="ob__heart ob__heart--on"
+                  aria-label={`Remove ${name}`}
+                  aria-pressed={true}
+                  onClick={() => onToggle(name)}
+                >
+                  <HeartIcon filled />
+                </button>
+              </div>
+            ))}
+
+          {showCustomBrand && (
+            <div className={`ob__brand-row ob__brand-row--custom${hasSelectedCustom ? ' ob__brand-row--on' : ''}`}>
+              <span className="ob__brand-name">{customBrand}</span>
+              <button
+                type="button"
+                className={`ob__heart${hasSelectedCustom ? ' ob__heart--on' : ''}`}
+                aria-label={hasSelectedCustom ? `Remove ${customBrand}` : `Add ${customBrand}`}
+                aria-pressed={hasSelectedCustom}
+                onClick={toggleCustomBrand}
+              >
+                <HeartIcon filled={hasSelectedCustom} />
+              </button>
+            </div>
+          )}
+
           {brands.map((name) => {
-            const isOn = selected.has(name);
+            const isOn = Array.from(selected).some((brand) => labelKey(brand) === labelKey(name));
             return (
               <div key={name} className={`ob__brand-row${isOn ? ' ob__brand-row--on' : ''}`}>
                 <span className="ob__brand-name">{name}</span>

@@ -39,12 +39,15 @@ export function Walkthrough({ onDone }: WalkthroughProps) {
   // Cross-fade between steps.
   useEffect(() => {
     if (step === render) return;
-    setShown(false);
+    const hide = requestAnimationFrame(() => setShown(false));
     const t = setTimeout(() => {
       setRender(step);
       requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
     }, TRANSITION_MS);
-    return () => clearTimeout(t);
+    return () => {
+      cancelAnimationFrame(hide);
+      clearTimeout(t);
+    };
   }, [step, render]);
 
   // Measure the bottom query bar so step 2 can spotlight + point at it.

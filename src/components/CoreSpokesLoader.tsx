@@ -33,6 +33,9 @@ interface CoreSpokesLoaderProps {
   compact?: boolean;
   label?: string;
   showText?: boolean;
+  // When the label cycles through phrases, blur+fade each one in and out. The
+  // text is keyed on the label so every change restarts the CSS cycle.
+  animateLabel?: boolean;
 }
 
 function isWithinTriangleMask(row: number, col: number) {
@@ -47,6 +50,7 @@ export function CoreSpokesLoader({
   compact = false,
   label = 'Curating personalised outfits',
   showText = true,
+  animateLabel = false,
 }: CoreSpokesLoaderProps) {
   return (
     <div
@@ -75,7 +79,16 @@ export function CoreSpokesLoader({
           );
         })}
       </div>
-      {showText && <p className="core-spokes-loader__text">{label}</p>}
+      {showText && (
+        <p
+          key={label}
+          className={`core-spokes-loader__text${
+            animateLabel ? ' core-spokes-loader__text--cycling' : ''
+          }`}
+        >
+          {label}
+        </p>
+      )}
     </div>
   );
 }

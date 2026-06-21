@@ -2,9 +2,10 @@ import { outfitFor, formatPrice, type Item } from '../data/items';
 
 interface OutfitStripProps {
   item: Item;
+  onSelectPiece?: (pieceId: string, rect: DOMRect) => void;
 }
 
-export function OutfitStrip({ item }: OutfitStripProps) {
+export function OutfitStrip({ item, onSelectPiece }: OutfitStripProps) {
   const { pieces } = outfitFor(item);
 
   return (
@@ -13,7 +14,12 @@ export function OutfitStrip({ item }: OutfitStripProps) {
       <div className="preview__strip" role="list">
         {pieces.map((piece) => (
           <div className="preview__item" role="listitem" key={piece.id}>
-            <button className="preview__chip" type="button" aria-label={piece.label}>
+            <button
+              className="preview__chip"
+              type="button"
+              aria-label={piece.label}
+              onClick={(event) => onSelectPiece?.(piece.id, event.currentTarget.getBoundingClientRect())}
+            >
               <img
                 className="preview__chip-img"
                 src={piece.imageUrl}

@@ -64,6 +64,7 @@ type StylistRunsByItem = Record<number, StylistRun[]>;
 
 interface DetailViewProps {
   startItem: Item;
+  initialPieceId?: string;
   originRect: TileRect;
   bagCount: number;
   bagPulseKey: number;
@@ -73,6 +74,7 @@ interface DetailViewProps {
 
 export function DetailView({
   startItem,
+  initialPieceId,
   originRect,
   bagCount,
   bagPulseKey,
@@ -139,7 +141,8 @@ export function DetailView({
   // Selected piece + size are reset when the outfit (carousel swipe) or piece
   // changes. Done by adjusting state during render via previous-value trackers
   // rather than effects — no extra commit, no cascading-render lint.
-  const [pieceId, setPieceId] = useState(outfit.pieces[0].id);
+  const initialPiece = outfit.pieces.find((p) => p.id === initialPieceId) ?? outfit.pieces[0];
+  const [pieceId, setPieceId] = useState(initialPiece.id);
   const [prevItemId, setPrevItemId] = useState(activeItem.id);
   if (activeItem.id !== prevItemId) {
     setPrevItemId(activeItem.id);

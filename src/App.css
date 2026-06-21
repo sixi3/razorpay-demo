@@ -23,6 +23,32 @@
   background: #fff;
 }
 
+/* Loader shown while a query "searches" for a new outfit grid. It covers only
+   the grid surface — rendered right after the grid and left at default stacking
+   so the positive z-index header/dock keep painting above it and stay usable. */
+.app__search-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  animation: search-overlay-in 200ms ease both;
+}
+
+/* The center reticle belongs to the grid, so hide it while the loader is in. */
+.app--searching .app__center-marker {
+  visibility: hidden;
+}
+
+@keyframes search-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .core-spokes-loader {
   display: flex;
   flex-direction: column;
@@ -69,6 +95,35 @@
   white-space: nowrap;
 }
 
+/* Each cycled phrase blurs + fades in, holds, then blurs + fades out. Duration
+   matches STEP_MS in SearchingOverlay so the out lands just before the swap. */
+.core-spokes-loader__text--cycling {
+  animation: core-spokes-text-cycle 1250ms ease both;
+}
+
+@keyframes core-spokes-text-cycle {
+  0% {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(4px);
+  }
+  16% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+  82% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(-4px);
+  }
+}
+
 @keyframes core-spokes {
   0%,
   100% {
@@ -104,6 +159,13 @@
     animation: none;
     opacity: var(--dot-peak);
     transform: scale(1);
+  }
+
+  .core-spokes-loader__text--cycling {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
   }
 }
 
