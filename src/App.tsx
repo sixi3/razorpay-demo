@@ -81,6 +81,9 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
   const [bagCount, setBagCount] = useState(0);
   const [bagPulseKey, setBagPulseKey] = useState(0);
   const [searching, setSearching] = useState(false);
+  // True once a search has completed and reshuffled results are on screen — the
+  // query bar then offers a clear (✕) button instead of send.
+  const [searched, setSearched] = useState(false);
   const [shuffleSeed, setShuffleSeed] = useState(0);
   const handleSelect = useCallback((item: Item, rect: TileRect, pieceId?: string) => {
     setSelection({ item, rect, pieceId });
@@ -89,8 +92,16 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
     setBagCount((count) => count + quantity);
     setBagPulseKey((key) => key + 1);
   }, []);
-  const handleSearch = useCallback(() => setSearching(true), []);
+  const handleSearch = useCallback(() => {
+    setSearched(false);
+    setSearching(true);
+  }, []);
   const handleStop = useCallback(() => setSearching(false), []);
+  // Clear the query and drop the grid back to its original, unshuffled order.
+  const handleClearSearch = useCallback(() => {
+    setSearched(false);
+    setShuffleSeed(0);
+  }, []);
 
   // A search shows the dot-matrix loader for 5s, then reveals a re-jumbled grid.
   useEffect(() => {
@@ -98,6 +109,7 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
     const timer = window.setTimeout(() => {
       setShuffleSeed((seed) => seed + 1);
       setSearching(false);
+      setSearched(true);
     }, 5000);
     return () => window.clearTimeout(timer);
   }, [searching]);
@@ -145,7 +157,13 @@ function GridExperience({ showWalkthroughOnMount }: GridExperienceProps) {
         {/* The Includes preview mirrors the centered grid item, so it hides with
             the grid; the query bar stays bottom-anchored and in place. */}
         {!searching && <OutfitStrip item={centeredItem} onSelectPiece={handlePreviewSelect} />}
-        <QueryInput onSearch={handleSearch} loading={searching} onStop={handleStop} />
+        <QueryInput
+          onSearch={handleSearch}
+          loading={searching}
+          onStop={handleStop}
+          searched={searched}
+          onClear={handleClearSearch}
+        />
       </div>
 
       {selection && (

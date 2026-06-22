@@ -9,12 +9,24 @@ interface QueryInputProps {
   loading?: boolean;
   // Fired when the stop button is pressed mid-search.
   onStop?: () => void;
+  // True once a search has completed — the send button becomes a clear (✕)
+  // button that resets the query and grid.
+  searched?: boolean;
+  // Fired when the clear button is pressed; clears the query and restores the
+  // original grid.
+  onClear?: () => void;
 }
 
 // Conversational refinement ("make it more casual", "swap the shoes") will
 // connect to the AI stylist in a later version. For now a submit triggers the
 // search loading + grid reshuffle via onSearch.
-export function QueryInput({ onSearch, loading = false, onStop }: QueryInputProps) {
+export function QueryInput({
+  onSearch,
+  loading = false,
+  onStop,
+  searched = false,
+  onClear,
+}: QueryInputProps) {
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +76,25 @@ export function QueryInput({ onSearch, loading = false, onStop }: QueryInputProp
         >
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="6.5" y="6.5" width="11" height="11" rx="2.5" fill="currentColor" />
+          </svg>
+        </button>
+      ) : searched ? (
+        <button
+          className="query__send query__send--active query__send--clear"
+          type="button"
+          aria-label="Clear search"
+          onClick={() => {
+            setValue('');
+            onClear?.();
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       ) : (
